@@ -1,35 +1,33 @@
 use std::{
-    fmt::write,
-    fs::{read_to_string, OpenOptions},
-    io::{self, read_to_string, BufWriter, Write},
-    ops::Not,
+    fs::{self, read_to_string},
+    io,
     path::{Path, PathBuf},
-    rc::Rc,
 };
 
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
+use crate::config::Config;
+
+use self::tag::{Tag, TagIter};
+
+mod tag;
+
 pub struct Note {
     key: String,
     content: String,
-    tags: Vec<Tag>,
 }
 
 impl Note {
     pub fn load_from(path: &Path) -> io::Result<Self> {
         let key = Self::get_key_from_path_or_new_key(path);
         let content = read_to_string(path)?;
-        let mut tags = Vec::new();
-        Tag::parse_all_into(&mut tags, &content);
-        Ok(Self { key, content, tags })
+        Ok(Self { key, content })
     }
 
-    pub fn save(&self) -> io::Result<()> {
-        let path = PathBuf::from(format!("{}.md", self.key));
-        let file = OpenOptions::new().truncate(true).write(true).open(path)?;
-        let mut buffer = BufWriter::new(file);
-        buffer.write(self.content.as_bytes());
-        Ok(())
+    pub fn save(&self, config: &Config) -> io::Result<()> {
+        let mut path: PathBuf = [config.path(), self.key.as_ref()].iter().collect();
+        path.set_extension("md");
+        fs::write(path, &self.content)
     }
 
     fn get_key_from_path_or_new_key(path: &Path) -> String {
@@ -53,54 +51,9 @@ impl Note {
             .take(20)
             .collect()
     }
-}
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Tag {
-    name: Rc<str>,
-}
-
-impl Tag {
-    pub fn parse_all_into(buffer: &mut Vec<Self>, input: &str) {
-        let mut input = input;
-        loop {
-            let Some(tag_start) = input.find('#') else {
-                return;
-            };
-            input = &input[tag_start..];
-            let Some((tail, tag)) = Self::parse(input) else {
-                input = &input[1..];
-                continue;
-            };
-            buffer.push(tag);
-            input = tail;
-        }
-    }
-
-    pub fn parse(input: &str) -> Option<(&str, Self)> {
-        let name = input.strip_prefix('#')?;
-        let length = Self::tag_length(name);
-        if length != 0 {
-            return None;
-        }
-        let (name, input) = name.split_at(length);
-        Some((
-            input,
-            Self {
-                name: name.to_owned().into(),
-            },
-        ))
-    }
-
-    fn tag_length(name: &str) -> usize {
-        name
-            .chars()
-            .enumerate()
-            .find_map(|(index, char)| {
-                matches!(char, 'a' ..= 'z' | 'A' ..= 'Z' | '0' ..= '9' | 'ä' | 'ö' | 'ü' | '-' | '_')
-                    .not()
-                    .then_some(index)
-            })
-            .unwrap_or(name.len())
+    fn iter(&self) -> impl Iterator<Item = Tag> {
+        TagIter::new(&self.content)
     }
 }
+

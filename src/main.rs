@@ -20,7 +20,7 @@ fn main() -> io::Result<()> {
     match cli.commands() {
         Add(command) => {
             let file = command.file();
-            Note::load_from(file)?.save()?;
+            Note::load_from(file)?.save(&config)?;
         },
         Sort(command) => {},
         List(command) => {},
