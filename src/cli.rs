@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(version, about)]
@@ -26,7 +26,7 @@ pub enum Commands {
 
 #[derive(Debug, Args)]
 pub struct AddCommand {
-    file: PathBuf,
+    file: PathBuf
 }
 
 impl AddCommand {
@@ -42,12 +42,13 @@ pub struct SortCommand {
 
 #[derive(Debug, Args)]
 pub struct ListCommand {
-    item: ListItem
+    #[arg(short, long, default_value="false")]
+    tags: bool
 }
 
-#[derive(Copy, Clone, Debug, ValueEnum)]
-pub enum ListItem {
-    Tags,
-    Files
+impl ListCommand {
+    pub fn tags(&self) -> bool {
+        self.tags
+    }
 }
 

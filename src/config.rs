@@ -1,4 +1,4 @@
-use std::{fs::read_to_string, path::{Path, PathBuf}, str::FromStr};
+use std::{env, fs::read_to_string, ops::Add, path::{Path, PathBuf}};
 
 use serde::Deserialize;
 
@@ -15,8 +15,9 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Self {
+        let home_dir_notes = env::var("HOME").unwrap().add("/notes").into();
         Self {
-            path: PathBuf::from_str("~/notes").unwrap()
+            path: home_dir_notes
         }
     }
 }

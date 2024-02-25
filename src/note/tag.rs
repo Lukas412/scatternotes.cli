@@ -1,4 +1,4 @@
-use std::ops::Not;
+use std::{fmt::Display, ops::Not};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Tag<'a> {
@@ -9,7 +9,7 @@ impl<'a> Tag<'a> {
     pub fn parse(input: &'a str) -> Option<(&'a str, Self)> {
         let name = input.strip_prefix('#')?;
         let length = Self::tag_length(name);
-        if length != 0 {
+        if length == 0 {
             return None;
         }
         let (name, input) = name.split_at(length);
@@ -26,6 +26,12 @@ impl<'a> Tag<'a> {
                     .then_some(index)
             })
             .unwrap_or(name.len())
+    }
+}
+
+impl<'a> Display for Tag<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#{}", self.name)
     }
 }
 
