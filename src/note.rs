@@ -1,33 +1,41 @@
 use std::{
-    io::Write,
     fs::{read_to_string, OpenOptions},
+    io::Write,
     path::{Path, PathBuf},
 };
 
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
-use crate::config::Config;
+use crate::{config::Config, tag::Tag};
 
-pub use self::{error::{NoteError, NoteLoadingError, NoteSavingError}, tag::{Tag, TagIter}};
-
-mod tag;
+pub use self::error::{NoteError, NoteLoadingError, NoteSavingError};
 
 mod error {
-    use std::{error::Error, fmt::{Debug, Display}, io, path::{Path, PathBuf}};
+    use std::{
+        error::Error,
+        fmt::{Debug, Display},
+        io,
+        path::PathBuf,
+    };
 
     #[derive(Debug)]
-    pub struct NoteLoadingError<'a> {
+    pub struct NoteLoadingError {
         pub error: io::Error,
-        pub path: &'a Path,
+        pub path: PathBuf,
     }
 
-    impl<'a> Display for NoteLoadingError<'a> {
+    impl Display for NoteLoadingError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            writeln!(f, "The file {} could not be opened.\nSource: {}", self.path.display(), self.error)
+            writeln!(
+                f,
+                "The file {} could not be opened.\nSource: {}",
+                self.path.display(),
+                self.error
+            )
         }
     }
 
-    impl<'a> Error for NoteLoadingError<'a> {}
+    impl Error for NoteLoadingError {}
 
     #[derive(Debug)]
     pub struct NoteSavingError {
@@ -37,19 +45,24 @@ mod error {
 
     impl Display for NoteSavingError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            writeln!(f, "The file {} could not be saved.\nSource: {}", self.path.display(), self.error)
+            writeln!(
+                f,
+                "The file {} could not be saved.\nSource: {}",
+                self.path.display(),
+                self.error
+            )
         }
     }
 
     impl Error for NoteSavingError {}
 
     #[derive(Debug)]
-    pub enum NoteError<'a> {
-        Loading(NoteLoadingError<'a>),
+    pub enum NoteError {
+        Loading(NoteLoadingError),
         Saving(NoteSavingError),
     }
 
-    impl<'a> Display for NoteError<'a> {
+    impl Display for NoteError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
                 Self::Loading(error) => Display::fmt(&error, f),
@@ -58,15 +71,15 @@ mod error {
         }
     }
 
-    impl<'a> Error for NoteError<'a> {}
+    impl Error for NoteError {}
 
-    impl<'a> From<NoteLoadingError<'a>> for NoteError<'a> {
-        fn from(value: NoteLoadingError<'a>) -> Self {
+    impl From<NoteLoadingError> for NoteError {
+        fn from(value: NoteLoadingError) -> Self {
             NoteError::Loading(value)
         }
     }
 
-    impl<'a> From<NoteSavingError> for NoteError<'a> {
+    impl From<NoteSavingError> for NoteError {
         fn from(value: NoteSavingError) -> Self {
             NoteError::Saving(value)
         }
@@ -75,19 +88,47 @@ mod error {
 
 pub struct Note {
     key: String,
+    tags: Vec<Tag>,
     content: String,
 }
 
 impl Note {
-    pub fn load_from(path: &Path) -> Result<Self, NoteLoadingError> {
-        let key = Self::get_key_from_path_or_new_key(path);
-        let content = read_to_string(path)
-            .map_err(|error| NoteLoadingError { error, path })?;
-        Ok(Self { key, content })
+    pub fn new() -> Self {
+        Self {
+            key: Self::generate_new_key(),
+            tags: Vec::new(),
+            content: String::new(),
+        }
     }
 
-    pub fn save(&self, config: &Config) -> Result<(), NoteSavingError> {
-        let mut path: PathBuf = [config.path(), self.key.as_ref()].iter().collect();
+    pub fn with_tags(mut self, tags: impl IntoIterator<Item = Tag>) -> Self {
+        self.add_tags(tags);
+        self
+    }
+
+    pub fn add_tags(&mut self, tags: impl IntoIterator<Item = Tag>) {
+        for tag in tags {
+            if !self.has_tag(&tag) {
+                self.tags.push(tag);
+            }
+        }
+    }
+
+    pub fn has_tag(&self, tag: &Tag) -> bool {
+        self.tags.iter().any(|note_tag| note_tag == tag)
+    }
+
+    pub fn load_from(path: PathBuf) -> Result<Self, NoteLoadingError> {
+        let key = Self::get_key_from_path_or_new_key(path.as_ref());
+        let tags = Vec::new();
+        match read_to_string(&path) {
+            Ok(content) => return Ok(Self { key, tags, content }),
+            Err(error) => return Err(NoteLoadingError { error, path }),
+        };
+    }
+
+    pub fn save(&self, config: &Config) -> Result<PathBuf, NoteSavingError> {
+        let mut path: PathBuf = config.path().join(&self.key);
         path.set_extension("md");
         let file = OpenOptions::new()
             .create_new(true)
@@ -99,8 +140,11 @@ impl Note {
             Ok(file) => file,
             Err(error) => return Err(NoteSavingError { error, path }),
         };
-        write!(file, "{}", &self.content)
-            .map_err(|error| NoteSavingError { error, path })
+        let result = 
+        match result {
+            Ok(_) => return Ok(path),
+            Err(error) => return Err(NoteSavingError { error, path }),
+        }
     }
 
     pub fn key(&self) -> &str {
@@ -112,7 +156,8 @@ impl Note {
             .filter(|key| key.len() == 23)
             .filter(|key| key.ends_with(".md"))
             .filter(|key| {
-                let valid_key_chars = key.chars()
+                let valid_key_chars = key
+                    .chars()
                     .take_while(|char| matches!(char, 'A' ..= 'Z' | '0' ..= '9'))
                     .count();
                 valid_key_chars == 20
@@ -129,8 +174,7 @@ impl Note {
             .collect()
     }
 
-    pub fn tags(&self) -> impl Iterator<Item = Tag> {
-        TagIter::new(&self.content)
+    pub fn tags(&self) -> impl Iterator<Item = &Tag> {
+        self.tags.iter()
     }
 }
-
