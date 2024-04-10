@@ -93,7 +93,9 @@ fn main() {
                 let mut file_tags_match = true;
 
                 for tag in tags.iter() {
-                    let tag = note_tags.iter().find(|note_tag| note_tag == tag);
+                    let tag = note_tags
+                        .iter()
+                        .find(|note_tag| note_tag.contains(tag.as_str()));
 
                     if tag.is_some() {
                         continue;
@@ -109,13 +111,12 @@ fn main() {
 
                 let _ = writeln!(stdout, "{}", file.display());
             }
-            return;
         }
         Some((command, _)) => {
             writeln!(stderr, "ERROR \"command not implemented\" \"{}\"", command).unwrap()
         }
         None => {}
-    }
+    };
 }
 
 fn note_files(config: &Config) -> Option<impl Iterator<Item = PathBuf>> {
