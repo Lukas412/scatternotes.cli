@@ -5,9 +5,11 @@ use std::{
 };
 
 use clap::{value_parser, Arg, ArgAction, Command};
+use commit::commit_notes;
 use config::Config;
 use generate::generate_new_note_path;
 
+mod commit;
 mod config;
 mod generate;
 
@@ -36,6 +38,8 @@ fn main() {
                         .help("display the tags which matched the search parameters"),
                 ])
                 .about("search for notes using tags"),
+            Command::new("commit")
+                .about("commit the changes using git and push them to the remote"),
         ])
         .get_matches();
 
@@ -125,6 +129,7 @@ fn main() {
                 }
             }
         }
+        Some(("commit", _)) => commit_notes(&config),
         Some((command, _)) => {
             writeln!(stderr, "ERROR \"command not implemented\" \"{}\"", command).unwrap()
         }
