@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{value_parser, Arg, Command};
+use clap::{value_parser, Arg, ArgAction, Command};
 use config::Config;
 use generate::generate_new_note_path;
 
@@ -24,9 +24,17 @@ fn main() {
                 .about("generate new note paths that do not yet exist"),
             Command::new("list").about("list all possible note files"),
             Command::new("search")
-                .args([Arg::new("tags")
-                    .num_args(1..)
-                    .help("the tags to search for. (the tags are additive)")])
+                .alias("s")
+                .args([
+                    Arg::new("tags")
+                        .num_args(1..)
+                        .help("the tags to search for. (the tags are additive)"),
+                    Arg::new("show-tags")
+                        .short('t')
+                        .long("show-tags")
+                        .action(ArgAction::SetTrue)
+                        .help("display the tags which matched the search parameters"),
+                ])
                 .about("search for notes using tags"),
         ])
         .get_matches();
@@ -71,6 +79,7 @@ fn main() {
                 return;
             };
             let tags: Vec<_> = tags.into_iter().collect();
+            let show_tags = command.get_flag("show-tags");
 
             let Some(files) = note_files(&config) else {
                 let _ = writeln!(
@@ -109,7 +118,11 @@ fn main() {
                     continue;
                 }
 
-                let _ = writeln!(stdout, "{}", file.display());
+                if show_tags {
+                    let _ = writeln!(stdout, "{}|{}", file.display(), note_tags.join(","));
+                } else {
+                    let _ = writeln!(stdout, "{}", file.display());
+                }
             }
         }
         Some((command, _)) => {
@@ -169,6 +182,16 @@ fn read_note_tags(filepath: &Path) -> Result<Vec<String>, String> {
 
             tags.push(buffer);
         }
+
+        let Some(buffer) = tag.take() else {
+            continue;
+        };
+
+        if buffer.is_empty() {
+            continue;
+        }
+
+        tags.push(buffer);
     }
 
     Ok(tags)
