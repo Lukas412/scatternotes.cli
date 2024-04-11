@@ -24,7 +24,13 @@ fn main() {
                     .value_parser(value_parser!(usize))
                     .help("the number of notes to generate (1 by default)")])
                 .about("generate new note paths that do not yet exist"),
-            Command::new("list").about("list all possible note files"),
+            Command::new("list")
+                .args([Arg::new("show-tags")
+                    .short('t')
+                    .long("show-tags")
+                    .action(ArgAction::SetTrue)
+                    .help("display the tags of the notes")])
+                .about("list all possible note files"),
             Command::new("search")
                 .alias("s")
                 .args([
@@ -35,7 +41,7 @@ fn main() {
                         .short('t')
                         .long("show-tags")
                         .action(ArgAction::SetTrue)
-                        .help("display the tags which matched the search parameters"),
+                        .help("display the tags of the notes, which matched the search parameters"),
                 ])
                 .about("search for notes using tags"),
             Command::new("commit")
@@ -63,7 +69,7 @@ fn main() {
                 existing.push(note_path);
             }
         }
-        Some(("list", _)) => {
+        Some(("list", command)) => {
             let Some(files) = note_files(&config) else {
                 let _ = writeln!(
                     stderr,
@@ -72,9 +78,22 @@ fn main() {
                 );
                 return;
             };
+            let show_tags = command.get_flag("show-tags");
 
             for file in files {
-                let _ = writeln!(stdout, "{}", file.display());
+                if !show_tags {
+                    let _ = writeln!(stdout, "{}", file.display());
+                    continue;
+                }
+
+                let note_tags = match read_note_tags(&file) {
+                    Ok(tags) => tags,
+                    Err(err) => {
+                        eprintln!("ERROR {} \"{}\"", file.display(), err);
+                        return;
+                    }
+                };
+                println!("{}|{}", file.display(), note_tags.join(","));
             }
         }
         Some(("search", command)) => {
