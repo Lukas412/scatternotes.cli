@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     fs::{self, File},
     io::{self, BufRead, BufReader, Write},
     path::{Path, PathBuf},
@@ -8,6 +9,7 @@ use clap::{value_parser, Arg, ArgAction, Command};
 use commit::commit_notes;
 use config::Config;
 use generate::generate_new_note_path;
+use itertools::Itertools;
 
 mod commit;
 mod config;
@@ -93,7 +95,7 @@ fn main() {
                         return;
                     }
                 };
-                println!("{}|{}", file.display(), note_tags.join(","));
+                println!("{}|{}", file.display(), note_tags.iter().join(","));
             }
         }
         Some(("search", command)) => {
@@ -113,8 +115,9 @@ fn main() {
                 return;
             };
 
+            let mut found_tags = Vec::new();
             for file in files {
-                let note_tags = match read_note_tags(&file) {
+                let mut note_tags = match read_note_tags(&file) {
                     Ok(tags) => tags,
                     Err(err) => {
                         let _ = writeln!(stderr, "ERROR {} \"{}\"", file.display(), err);
@@ -125,16 +128,22 @@ fn main() {
                 let mut file_tags_match = true;
 
                 for tag in tags.iter() {
-                    let tag = note_tags
+                    let tag_position = note_tags
                         .iter()
-                        .find(|note_tag| note_tag.contains(tag.as_str()));
+                        .position(|note_tag| note_tag.contains(tag.as_str()));
 
-                    if tag.is_some() {
+                    if let Some(index) = tag_position {
+                        if let Some(tag) = note_tags.swap_remove_back(index) {
+                            found_tags.push(tag);
+                        }
                         continue;
                     }
 
                     file_tags_match = false;
                     break;
+                }
+                for tag in found_tags.drain(0..).rev() {
+                    note_tags.push_front(tag);
                 }
 
                 if !file_tags_match {
@@ -142,7 +151,7 @@ fn main() {
                 }
 
                 if show_tags {
-                    let _ = writeln!(stdout, "{}|{}", file.display(), note_tags.join(","));
+                    let _ = writeln!(stdout, "{}|{}", file.display(), note_tags.iter().join(","));
                 } else {
                     let _ = writeln!(stdout, "{}", file.display());
                 }
@@ -171,10 +180,10 @@ fn note_files(config: &Config) -> Option<impl Iterator<Item = PathBuf>> {
     Some(result)
 }
 
-fn read_note_tags(filepath: &Path) -> Result<Vec<String>, String> {
+fn read_note_tags(filepath: &Path) -> Result<VecDeque<String>, String> {
     let file = File::open(filepath).map_err(|err| err.to_string())?;
     let reader = BufReader::new(file);
-    let mut tags = Vec::new();
+    let mut tags = VecDeque::new();
 
     let mut tag: Option<String> = None;
 
@@ -204,7 +213,7 @@ fn read_note_tags(filepath: &Path) -> Result<Vec<String>, String> {
                 continue;
             }
 
-            tags.push(buffer);
+            tags.push_back(buffer);
         }
 
         let Some(buffer) = tag.take() else {
@@ -215,7 +224,7 @@ fn read_note_tags(filepath: &Path) -> Result<Vec<String>, String> {
             continue;
         }
 
-        tags.push(buffer);
+        tags.push_back(buffer);
     }
 
     Ok(tags)
