@@ -22,11 +22,13 @@ fn main() {
         .subcommand_required(true)
         .subcommands([
             Command::new("generate")
+                .alias("g")
                 .args([Arg::new("count")
                     .value_parser(value_parser!(usize))
                     .help("the number of notes to generate (1 by default)")])
                 .about("generate new note paths that do not yet exist"),
             Command::new("list")
+                .alias("l")
                 .args([Arg::new("show-tags")
                     .short('t')
                     .long("show-tags")
@@ -47,6 +49,7 @@ fn main() {
                 ])
                 .about("search for notes using tags"),
             Command::new("commit")
+                .alias("c")
                 .about("commit the changes using git and push them to the remote"),
         ])
         .get_matches();
