@@ -201,7 +201,10 @@ fn read_note_tags(filepath: &Path) -> Result<VecDeque<String>, String> {
 
             let is_letter = matches!(char, 'a' ..= 'z' | 'A' ..= 'Z' );
             let is_number = matches!(char, '0'..='9');
-            let is_special = matches!(char, '_' | '-' | '+' | '(' | ')' | '=' | '*' | '%');
+            let is_special = matches!(
+                char,
+                '_' | '-' | '+' | '(' | ')' | '=' | '*' | '%' | '\'' | '"'
+            );
             let is_umlaut = matches!(char, 'ä' | 'ö' | 'ü' | 'ß');
             if is_letter || is_number || is_special || is_umlaut {
                 buffer.push(char);
