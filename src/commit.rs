@@ -7,7 +7,6 @@ pub fn commit_notes(config: &Config) {
         .args(["status", "--short"])
         .current_dir(config.path())
         .output();
-
     match git_status {
         Ok(result) => {
             if !result.status.success() {
@@ -74,8 +73,26 @@ pub fn commit_notes(config: &Config) {
         }
     }
 
+    let git_pull = Command::new("git")
+        .arg("pull")
+        .current_dir(config.path())
+        .status();
+    match git_pull {
+        Ok(result) => {
+            if !result.success() {
+                eprintln!("ERROR 'git pull' exited with a error status: {}", result);
+                return;
+            }
+        }
+        Err(error) => {
+            eprintln!("ERROR could not execute 'git pull'");
+            eprintln!("{}", error);
+            return;
+        }
+    }
+
     let git_push = Command::new("git")
-        .args(["push"])
+        .arg("push")
         .current_dir(config.path())
         .status();
     match git_push {
