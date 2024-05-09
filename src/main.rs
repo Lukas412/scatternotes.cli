@@ -10,6 +10,7 @@ use commit::commit_notes;
 use config::Config;
 use generate::generate_new_note_path;
 use itertools::Itertools;
+use termfmt::strategies::{TermFmtStrategy, TermStrategiesExt, TermStrategyExt};
 
 mod commit;
 mod config;
@@ -52,11 +53,13 @@ fn main() {
                 .alias("c")
                 .about("commit the changes using git and push them to the remote"),
         ])
+        .term_strategies()
         .get_matches();
 
     let config = Config::load();
     let mut stdout = io::stdout();
-    let mut stderr = io::stderr();
+
+    let fmt = cli.term_strategy();
 
     match cli.subcommand() {
         Some(("generate", command)) => {
@@ -70,31 +73,31 @@ fn main() {
                     continue;
                 }
 
-                let _ = writeln!(stdout, "{}", note_path.display());
+                fmt.info(note_path.display());
                 existing.push(note_path);
             }
         }
         Some(("list", command)) => {
             let Some(files) = note_files(&config) else {
-                let _ = writeln!(
-                    stderr,
-                    "ERROR \"could not read notes directory\" {}",
-                    config.path().display()
-                );
+                fmt.error(format_args!(
+                    "{}: {}",
+                    config.path().display(),
+                    "could not read notes directory!"
+                ));
                 return;
             };
             let show_tags = command.get_flag("show-tags");
 
             for file in files {
                 if !show_tags {
-                    let _ = writeln!(stdout, "{}", file.display());
+                    fmt.text(file.display());
                     continue;
                 }
 
                 let note_tags = match read_note_tags(&file) {
                     Ok(tags) => tags,
                     Err(err) => {
-                        eprintln!("ERROR {} \"{}\"", file.display(), err);
+                        fmt.error(format_args!("{}: {}", file.display(), err));
                         return;
                     }
                 };
@@ -103,18 +106,16 @@ fn main() {
         }
         Some(("search", command)) => {
             let Some(tags) = command.get_many::<String>("tags") else {
-                let _ = writeln!(stderr, "ERROR \"please provide tags to search by\"");
+                fmt.error("please provide tags to search by!");
+                fmt.end();
                 return;
             };
             let tags: Vec<_> = tags.into_iter().collect();
             let show_tags = command.get_flag("show-tags");
 
             let Some(files) = note_files(&config) else {
-                let _ = writeln!(
-                    stderr,
-                    "ERROR \"could not read notes directory\" {}",
-                    config.path().display()
-                );
+                fmt.error("could not read notes directory!");
+                fmt.end();
                 return;
             };
 
@@ -123,7 +124,8 @@ fn main() {
                 let mut note_tags = match read_note_tags(&file) {
                     Ok(tags) => tags,
                     Err(err) => {
-                        let _ = writeln!(stderr, "ERROR {} \"{}\"", file.display(), err);
+                        fmt.error(format_args!("{}: {}", file.display(), err));
+                        fmt.end();
                         return;
                     }
                 };
@@ -160,12 +162,16 @@ fn main() {
                 }
             }
         }
-        Some(("commit", _)) => commit_notes(&config),
+        Some(("commit", _)) => {
+            commit_notes(&config, &fmt);
+        }
         Some((command, _)) => {
-            writeln!(stderr, "ERROR \"command not implemented\" \"{}\"", command).unwrap()
+            fmt.error(format_args!("command not implemented: {}", command));
+            return;
         }
         None => {}
     };
+    fmt.end();
 }
 
 fn note_files(config: &Config) -> Option<impl Iterator<Item = PathBuf>> {

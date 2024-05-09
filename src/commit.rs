@@ -1,115 +1,96 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
+
+use termfmt::{
+    command::{CmdOutErr, CmdStatErr},
+    strategies::TermFmtStrategy,
+    TermError, TermStyle,
+};
 
 use crate::config::Config;
 
-pub fn commit_notes(config: &Config) {
-    let git_status = Command::new("git")
+pub fn commit_notes<'a>(config: &Config, fmt: &impl TermFmtStrategy) {
+    fmt.headline("RUNNING".fg_green().bold());
+    fmt.action("git status --short");
+    let Some(stdout) = Command::new("git")
         .args(["status", "--short"])
         .current_dir(config.path())
-        .output();
-    match git_status {
-        Ok(result) => {
-            if !result.status.success() {
-                eprintln!(
-                    "ERROR 'git status' exited with a error status: {}",
-                    result.status
-                );
-                if let Ok(stderr) = String::from_utf8(result.stderr) {
-                    eprintln!("{}", stderr);
-                }
-                return;
-            }
-            let Ok(stdout) = String::from_utf8(result.stdout) else {
-                return;
-            };
-            let not_changes = stdout.is_empty();
-            if not_changes {
-                println!("INFO no changes detected");
-                return;
-            }
-            let num_notes = stdout.chars().filter(|char| matches!(char, '\n')).count();
-            println!("INFO committing {} notes", num_notes);
-        }
-        Err(error) => {
-            eprintln!("ERROR could not execute 'git status'");
-            eprintln!("{}", error);
-            return;
-        }
-    }
-
-    let git_add = Command::new("git")
-        .args(["add", "--all"])
-        .current_dir(config.path())
-        .status();
-    match git_add {
-        Ok(result) => {
-            if !result.success() {
-                eprintln!("ERROR 'git add' exited with a error status: {}", result);
-                return;
-            }
-        }
-        Err(error) => {
-            eprintln!("ERROR could not execute 'git add'");
-            eprintln!("{}", error);
-            return;
-        }
+        .output()
+        .cmd_out_err()
+        .termerr()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+    else {
+        return;
     };
 
-    let git_commit = Command::new("git")
+    let not_changes = stdout.is_empty();
+    if not_changes {
+        fmt.info("no changes were detected!");
+        return;
+    }
+    let num_notes = stdout.chars().filter(|char| matches!(char, '\n')).count();
+
+    if num_notes == 1 {
+        fmt.info("committing one note!");
+    } else {
+        fmt.info(format_args!("committing {} notes!", num_notes));
+    }
+
+    fmt.headline("RUNNING".fg_green().bold());
+    fmt.action("git add --all");
+    if Command::new("git")
+        .args(["add", "--all"])
+        .current_dir(config.path())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .cmd_stat_err()
+        .termerr()
+        .is_none()
+    {
+        return;
+    }
+
+    fmt.action("git commit -m \"update notes\"");
+    if Command::new("git")
         .args(["commit", "-m", "\"update notes\""])
         .current_dir(config.path())
-        .status();
-    match git_commit {
-        Ok(result) => {
-            if !result.success() {
-                eprintln!("ERROR 'git commit' exited with a error status: {}", result);
-                return;
-            }
-        }
-        Err(error) => {
-            eprintln!("ERROR could not execute 'git commit'");
-            eprintln!("{}", error);
-            return;
-        }
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .cmd_stat_err()
+        .termerr()
+        .is_none()
+    {
+        return;
     }
 
-    let git_pull = Command::new("git")
+    fmt.action("git pull");
+    if Command::new("git")
         .arg("pull")
         .current_dir(config.path())
-        .status();
-    match git_pull {
-        Ok(result) => {
-            if !result.success() {
-                eprintln!("ERROR 'git pull' exited with a error status: {}", result);
-                return;
-            }
-        }
-        Err(error) => {
-            eprintln!("ERROR could not execute 'git pull'");
-            eprintln!("{}", error);
-            return;
-        }
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .cmd_stat_err()
+        .termerr()
+        .is_none()
+    {
+        return;
     }
 
-    let git_push = Command::new("git")
+    fmt.action("git push");
+    if Command::new("git")
         .arg("push")
         .current_dir(config.path())
-        .status();
-    match git_push {
-        Ok(result) => {
-            if !result.success() {
-                eprintln!("ERROR 'git push' exited with a error status: {}", result);
-                return;
-            }
-        }
-        Err(error) => {
-            eprintln!("ERROR could not execute 'git push'");
-            eprintln!("{}", error);
-            return;
-        }
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .cmd_stat_err()
+        .termerr()
+        .is_none()
+    {
+        return;
     }
 
-    println!("INFO commit was successful");
-
-    ()
+    fmt.info("the commit was successful!");
 }
