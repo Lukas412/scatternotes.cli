@@ -27,6 +27,8 @@ pub struct DataBundle {
     command_output: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     info: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    error: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -114,6 +116,9 @@ impl BundleFmt for DataBundle {
             writer.serialize(output)?;
         }
         for output in self.info.iter() {
+            writer.serialize(output)?;
+        }
+        for output in self.error.iter() {
             writer.serialize(output)?;
         }
         Ok(())

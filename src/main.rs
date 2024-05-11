@@ -1,7 +1,7 @@
 use std::{
     collections::{HashSet, VecDeque},
     fs::{self, File},
-    io::{stdout, BufRead, BufReader, IsTerminal},
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
 
@@ -9,7 +9,7 @@ use clap::{value_parser, Arg, ArgAction, Command};
 use commit::commit_notes;
 use config::Config;
 use generate::generate_new_note_path;
-use termfmt::TermFmt;
+use termfmt::{TermFmtExt, TermFmtsExt};
 
 use self::output::{DataBundle, OutputFmt};
 
@@ -55,45 +55,11 @@ fn main() -> eyre::Result<()> {
                 .alias("c")
                 .about("commit the changes using git and push them to the remote"),
         ])
-        .args([
-            Arg::new("plain")
-                .long("plain")
-                .action(ArgAction::SetTrue)
-                .conflicts_with_all(["interactive", "json", "csv"])
-                .help("force plain output"),
-            Arg::new("interactive")
-                .long("interactive")
-                .action(ArgAction::SetTrue)
-                .conflicts_with_all(["plain", "json", "csv"])
-                .help("force interactive output"),
-            Arg::new("json")
-                .long("json")
-                .action(ArgAction::SetTrue)
-                .conflicts_with_all(["plain", "interactive", "csv"])
-                .help("force json output"),
-            Arg::new("csv")
-                .long("csv")
-                .action(ArgAction::SetTrue)
-                .conflicts_with_all(["plain", "interactive", "json"])
-                .help("force csv output"),
-        ])
+        .termfmts()
         .get_matches();
 
     let config = Config::load();
-
-    let mut term = if cli.get_flag("plain") {
-        TermFmt::plain()
-    } else if cli.get_flag("interactive") {
-        TermFmt::interactive()
-    } else if cli.get_flag("json") {
-        TermFmt::json(DataBundle::new(config.clone()))
-    } else if cli.get_flag("csv") {
-        TermFmt::csv(DataBundle::new(config.clone()))
-    } else if stdout().is_terminal() {
-        TermFmt::interactive()
-    } else {
-        TermFmt::plain()
-    };
+    let mut term = cli.termfmt(DataBundle::new(config.clone()));
 
     match cli.subcommand() {
         Some(("generate", command)) => {
