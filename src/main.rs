@@ -11,8 +11,12 @@ use config::Config;
 use generate::generate_new_note_path;
 use termfmt::{TermFmtExt, TermFmtsExt};
 
-use self::output::{DataBundle, OutputFmt};
+use self::{
+    clean::clean_notes,
+    output::{DataBundle, OutputFmt},
+};
 
+mod clean;
 mod commit;
 mod config;
 mod generate;
@@ -54,6 +58,7 @@ fn main() -> eyre::Result<()> {
             Command::new("commit")
                 .alias("c")
                 .about("commit the changes using git and push them to the remote"),
+            Command::new("clean").about("clean the notes directory"),
         ])
         .termfmts()
         .get_matches();
@@ -167,6 +172,10 @@ fn main() -> eyre::Result<()> {
         }
         Some(("commit", _)) => {
             commit_notes(&config, &mut term);
+            term.flush()?;
+        }
+        Some(("clean", _)) => {
+            clean_notes(&config, &mut term);
             term.flush()?;
         }
         Some((command, _)) => {
