@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use termfmt::{BundleFmt, DataFmt, TermFmt, TermStyle};
+use termfmt::{termarrow, termerr, termheader, terminfo, BundleFmt, DataFmt, TermFmt};
 
 use crate::config::Config;
 
@@ -25,6 +25,8 @@ pub struct DataBundle {
     list_output: Vec<ListEntry>,
     #[serde(rename = "output", skip_serializing_if = "Vec::is_empty")]
     command_output: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    info: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -52,9 +54,9 @@ impl DataFmt for OutputData {
             OutputData::File(file) => println!("{}", file.display()),
             OutputData::List(ListEntry { file, tags }) => {
                 if tags.is_empty() {
-                    println!("{}", file.display());
+                    println!("{}", file.display())
                 } else {
-                    println!("{}|{}", file.display(), tags.join(","));
+                    println!("{}|{}", file.display(), tags.join(","))
                 }
             }
             OutputData::Headline(_) | OutputData::End => {}
@@ -63,25 +65,15 @@ impl DataFmt for OutputData {
 
     fn interactive(self) {
         match self {
-            OutputData::Info(value) => {
-                println!("\n{} {}", "INFO".fg_green().bold(), value);
-            }
-            OutputData::Error(value) => {
-                println!("\n{} {}", "ERROR".fg_red().bold(), value);
-            }
-            OutputData::Headline(value) => {
-                println!("\n{}", value.fg_green().bold());
-            }
-            OutputData::Command(value) => {
-                println!("{} {}", "->".fg_blue().bold(), value);
-            }
-            OutputData::File(file) => {
-                println!("{} {}", "->".fg_blue().bold(), file.display());
-            }
+            OutputData::Info(value) => terminfo(value),
+            OutputData::Error(value) => termerr(value),
+            OutputData::Headline(value) => termheader(value),
+            OutputData::Command(value) => termarrow(value),
+            OutputData::File(file) => termarrow(file.display()),
             OutputData::List(ListEntry { file, tags }) => {
-                println!("\n{}", file.display().fg_green().bold());
+                termheader(file.display());
                 if !tags.is_empty() {
-                    println!("{} {}", "->".fg_blue().bold(), tags.join(", "))
+                    termarrow(tags.join(", "))
                 }
             }
             OutputData::End => println!(),
@@ -97,6 +89,7 @@ impl BundleFmt for DataBundle {
             OutputData::File(value) => self.generate_output.push(value),
             OutputData::List(value) => self.list_output.push(value),
             OutputData::Command(value) => self.command_output.push(value),
+            OutputData::Info(value) => self.info.push(value),
             _ => {}
         }
     }
@@ -118,6 +111,9 @@ impl BundleFmt for DataBundle {
             writer.serialize((output.file.clone(), output.tags.join(" ")))?;
         }
         for output in self.command_output.iter() {
+            writer.serialize(output)?;
+        }
+        for output in self.info.iter() {
             writer.serialize(output)?;
         }
         Ok(())
