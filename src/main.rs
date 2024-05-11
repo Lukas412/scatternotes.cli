@@ -1,7 +1,7 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashSet, VecDeque},
     fs::{self, File},
-    io::{self, BufRead, BufReader, Write},
+    io::{stdout, BufRead, BufReader, IsTerminal},
     path::{Path, PathBuf},
 };
 
@@ -9,14 +9,16 @@ use clap::{value_parser, Arg, ArgAction, Command};
 use commit::commit_notes;
 use config::Config;
 use generate::generate_new_note_path;
-use itertools::Itertools;
-use termfmt::strategies::{TermFmtStrategy, TermStrategiesExt, TermStrategyExt};
+use termfmt::TermFmt;
+
+use self::output::{DataBundle, OutputFmt};
 
 mod commit;
 mod config;
 mod generate;
+mod output;
 
-fn main() {
+fn main() -> eyre::Result<()> {
     let cli = Command::new("scatternotes")
         .version("0.0.1")
         .about("a cli to create and manage notes")
@@ -53,18 +55,52 @@ fn main() {
                 .alias("c")
                 .about("commit the changes using git and push them to the remote"),
         ])
-        .term_strategies()
+        .args([
+            Arg::new("plain")
+                .long("plain")
+                .action(ArgAction::SetTrue)
+                .conflicts_with_all(["interactive", "json", "csv"])
+                .help("force plain output"),
+            Arg::new("interactive")
+                .long("interactive")
+                .action(ArgAction::SetTrue)
+                .conflicts_with_all(["plain", "json", "csv"])
+                .help("force interactive output"),
+            Arg::new("json")
+                .long("json")
+                .action(ArgAction::SetTrue)
+                .conflicts_with_all(["plain", "interactive", "csv"])
+                .help("force json output"),
+            Arg::new("csv")
+                .long("csv")
+                .action(ArgAction::SetTrue)
+                .conflicts_with_all(["plain", "interactive", "json"])
+                .help("force csv output"),
+        ])
         .get_matches();
 
     let config = Config::load();
-    let mut stdout = io::stdout();
 
-    let fmt = cli.term_strategy();
+    let mut term = if cli.get_flag("plain") {
+        TermFmt::plain()
+    } else if cli.get_flag("interactive") {
+        TermFmt::interactive()
+    } else if cli.get_flag("json") {
+        TermFmt::json(DataBundle::new(config.clone()))
+    } else if cli.get_flag("csv") {
+        TermFmt::csv(DataBundle::new(config.clone()))
+    } else if stdout().is_terminal() {
+        TermFmt::interactive()
+    } else {
+        TermFmt::plain()
+    };
 
     match cli.subcommand() {
         Some(("generate", command)) => {
+            term.headline("GENERATE");
+
             let count: usize = command.get_one("count").copied().unwrap_or(1);
-            let mut existing = Vec::with_capacity(count);
+            let mut existing = HashSet::with_capacity(count);
 
             while existing.len() < count {
                 let note_path = generate_new_note_path(&config);
@@ -73,50 +109,50 @@ fn main() {
                     continue;
                 }
 
-                fmt.info(note_path.display());
-                existing.push(note_path);
+                term.file(note_path.clone());
+                existing.insert(note_path);
             }
+            term.flush()?;
         }
         Some(("list", command)) => {
             let Some(files) = note_files(&config) else {
-                fmt.error(format_args!(
-                    "{}: {}",
-                    config.path().display(),
-                    "could not read notes directory!"
-                ));
-                return;
+                term.file_error(config.path(), "could not read notes directory!");
+                term.end();
+                return Ok(());
             };
             let show_tags = command.get_flag("show-tags");
 
             for file in files {
                 if !show_tags {
-                    fmt.text(file.display());
+                    term.list(file);
                     continue;
                 }
 
                 let note_tags = match read_note_tags(&file) {
                     Ok(tags) => tags,
                     Err(err) => {
-                        fmt.error(format_args!("{}: {}", file.display(), err));
-                        return;
+                        term.file_error(file, err);
+                        continue;
                     }
                 };
-                println!("{}|{}", file.display(), note_tags.iter().join(","));
+
+                term.list_with_tags(file, note_tags)
             }
+            term.flush()?;
         }
         Some(("search", command)) => {
             let Some(tags) = command.get_many::<String>("tags") else {
-                fmt.error("please provide tags to search by!");
-                fmt.end();
-                return;
+                term.error("please provide tags to search by!");
+                term.end();
+                return Ok(());
             };
             let tags: Vec<_> = tags.into_iter().collect();
             let show_tags = command.get_flag("show-tags");
 
             let Some(files) = note_files(&config) else {
-                fmt.error("could not read notes directory!");
-                fmt.end();
-                return;
+                term.error("could not read notes directory!");
+                term.end();
+                return Ok(());
             };
 
             let mut found_tags = Vec::new();
@@ -124,9 +160,9 @@ fn main() {
                 let mut note_tags = match read_note_tags(&file) {
                     Ok(tags) => tags,
                     Err(err) => {
-                        fmt.error(format_args!("{}: {}", file.display(), err));
-                        fmt.end();
-                        return;
+                        term.file_error(file, err);
+                        term.end();
+                        return Ok(());
                     }
                 };
 
@@ -156,22 +192,24 @@ fn main() {
                 }
 
                 if show_tags {
-                    let _ = writeln!(stdout, "{}|{}", file.display(), note_tags.iter().join(","));
+                    term.list_with_tags(file, note_tags);
                 } else {
-                    let _ = writeln!(stdout, "{}", file.display());
+                    term.list(file);
                 }
             }
+            term.flush()?;
         }
         Some(("commit", _)) => {
-            commit_notes(&config, &fmt);
+            commit_notes(&config, &mut term);
+            term.flush()?;
         }
         Some((command, _)) => {
-            fmt.error(format_args!("command not implemented: {}", command));
-            return;
+            term.error(format!("command not implemented: {}", command));
         }
         None => {}
     };
-    fmt.end();
+    term.end();
+    Ok(())
 }
 
 fn note_files(config: &Config) -> Option<impl Iterator<Item = PathBuf>> {
@@ -207,10 +245,7 @@ fn read_note_tags(filepath: &Path) -> Result<VecDeque<String>, String> {
 
             let is_letter = matches!(char, 'a' ..= 'z' | 'A' ..= 'Z' );
             let is_number = matches!(char, '0'..='9');
-            let is_special = matches!(
-                char,
-                '_' | '-' | '+' | '(' | ')' | '=' | '*' | '%' | '\'' | '"'
-            );
+            let is_special = matches!(char, '_' | '-' | '+' | '=');
             let is_umlaut = matches!(char, 'ä' | 'ö' | 'ü' | 'ß');
             if is_letter || is_number || is_special || is_umlaut {
                 buffer.push(char);
@@ -221,7 +256,7 @@ fn read_note_tags(filepath: &Path) -> Result<VecDeque<String>, String> {
                 continue;
             };
 
-            if buffer.is_empty() {
+            if buffer.is_empty() || tags.contains(&buffer) {
                 continue;
             }
 
@@ -232,7 +267,7 @@ fn read_note_tags(filepath: &Path) -> Result<VecDeque<String>, String> {
             continue;
         };
 
-        if buffer.is_empty() {
+        if buffer.is_empty() || tags.contains(&buffer) {
             continue;
         }
 
