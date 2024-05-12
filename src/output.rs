@@ -13,6 +13,7 @@ pub enum OutputData {
     Command(String),
     File(PathBuf),
     List(ListEntry),
+    CleanupJustATest(ListEntry),
     End,
 }
 
@@ -92,7 +93,10 @@ impl BundleFmt for DataBundle {
             OutputData::List(value) => self.list_output.push(value),
             OutputData::Command(value) => self.command_output.push(value),
             OutputData::Info(value) => self.info.push(value),
-            _ => {}
+            OutputData::Error(_)
+            | OutputData::Headline(_)
+            | OutputData::CleanupJustATest(_)
+            | OutputData::End => {}
         }
     }
 
@@ -134,6 +138,7 @@ pub trait OutputFmt {
     fn file(&mut self, file: impl Into<PathBuf>);
     fn list(&mut self, file: impl Into<PathBuf>);
     fn list_with_tags(&mut self, file: impl Into<PathBuf>, tags: impl Into<Vec<String>>);
+    fn cleanup_just_a_test(&mut self, file: PathBuf, tags: Vec<String>);
     fn end(&mut self);
 }
 
@@ -178,6 +183,10 @@ impl OutputFmt for TermFmt<OutputData, DataBundle> {
             file: file.into(),
             tags: tags.into(),
         }));
+    }
+
+    fn cleanup_just_a_test(&mut self, file: PathBuf, tags: Vec<String>) {
+        self.output(OutputData::CleanupJustATest(ListEntry { file, tags }));
     }
 
     fn end(&mut self) {
