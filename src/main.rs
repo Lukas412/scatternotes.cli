@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::VecDeque,
     fs::{self, File},
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
@@ -8,11 +8,17 @@ use std::{
 use clap::{value_parser, Arg, ArgAction, Command};
 use commit::commit_notes;
 use config::Config;
-use generate::generate_new_note_path;
+use nom::{
+    bytes::complete::{tag, take_while_m_n},
+    character::complete::{char, digit1},
+    sequence::tuple,
+    IResult,
+};
 use termfmt::{TermFmtExt, TermFmtsExt};
 
 use self::{
     clean::clean_notes,
+    generate::NameGenerator,
     output::{DataBundle, OutputFmt},
 };
 
@@ -20,6 +26,7 @@ mod clean;
 mod commit;
 mod config;
 mod generate;
+mod note;
 mod output;
 
 fn main() -> eyre::Result<()> {
@@ -71,18 +78,13 @@ fn main() -> eyre::Result<()> {
             term.headline("GENERATE");
 
             let count: usize = command.get_one("count").copied().unwrap_or(1);
-            let mut existing = HashSet::with_capacity(count);
+            let mut generator = NameGenerator::with_capacity(&config, count);
 
-            while existing.len() < count {
-                let note_path = generate_new_note_path(&config);
-
-                if existing.contains(&note_path) {
-                    continue;
-                }
-
-                term.file(note_path.clone());
-                existing.insert(note_path);
+            for _ in 0..count {
+                let note_path = generator.generate();
+                term.file(note_path);
             }
+
             term.flush()?;
         }
         Some(("list", command)) => {
@@ -200,6 +202,26 @@ fn note_files(config: &Config) -> Option<impl Iterator<Item = PathBuf>> {
                 .unwrap_or(false)
         });
     Some(result)
+}
+
+fn is_valid_note_name(note_path: &Path) -> bool {
+    let Some(note_name) = note_path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+
+    fn date(input: &str) -> IResult<&str, (&str, char, &str, char, &str)> {
+        tuple((digit1, char('-'), digit1, char('-'), digit1))(input)
+    }
+    fn key(input: &str) -> IResult<&str, &str> {
+        take_while_m_n(
+            20,
+            20,
+            |char| matches!(char, 'a'..='z' | 'A'..='Z' | '0'..='9'),
+        )(input)
+    }
+
+    let mut note_name_parser = tuple((date, char('_'), key, tag(".md")));
+    note_name_parser(note_name).is_ok()
 }
 
 fn read_note_tags(filepath: &Path) -> Result<VecDeque<String>, String> {
