@@ -35,11 +35,11 @@ pub fn clean_notes(config: &Config, term: &mut TermFmt<OutputData, DataBundle>) 
 
         let note = if !is_valid_note_name(&note) {
             term.cleanup_rename(&note);
-            let Some(date) = note_date(&note) else {
+            let Some(date) = note_date(config, &note) else {
                 term.error("could not get date of note!");
                 continue;
             };
-            let new_note = generator.generate_date(date);
+            let new_note = generator.generate_with_date(date);
             if let Err(error) = fs::rename(&note, &new_note) {
                 term.error(error);
                 continue;

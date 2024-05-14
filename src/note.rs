@@ -1,14 +1,18 @@
 use std::ffi::OsStr;
-use std::fs;
+use std::fs::{self};
 use std::path::Path;
+use std::process::Command;
 
 use chrono::NaiveDate;
 use nom::bytes::complete::tag;
 use nom::character::complete::{char, u16, u8};
 use nom::sequence::delimited;
 use nom::IResult;
+use termfmt::chrono::DateFmt;
 
-pub fn note_date(file: &Path) -> Option<NaiveDate> {
+use crate::config::Config;
+
+pub fn note_date(config: &Config, file: &Path) -> Option<NaiveDate> {
     if let Some(date) = file
         .file_name()
         .and_then(OsStr::to_str)
@@ -19,6 +23,7 @@ pub fn note_date(file: &Path) -> Option<NaiveDate> {
     fs::read_to_string(file)
         .ok()
         .and_then(|content| search_date(&content))
+        .or_else(|| git_log_first_date(config, file))
 }
 
 fn search_date(input: &str) -> Option<NaiveDate> {
@@ -44,6 +49,17 @@ fn date(input: &str) -> Option<NaiveDate> {
     }
 
     let (_, date) = date_impl(input).ok()?;
+    date
+}
+
+fn git_log_first_date(config: &Config, file: &Path) -> Option<NaiveDate> {
+    let output = Command::new("git")
+        .args(["log", "--reverse", "--date=short", file.to_str()?])
+        .current_dir(config.path())
+        .output()
+        .ok()?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let date = search_date(&stdout);
     date
 }
 

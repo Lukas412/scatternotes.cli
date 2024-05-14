@@ -27,10 +27,10 @@ impl<'a> NameGenerator<'a> {
     }
 
     pub fn generate(&mut self) -> PathBuf {
-        self.generate_date(Local::now().date_naive())
+        self.generate_with_date(Local::now().date_naive())
     }
 
-    pub fn generate_date(&mut self, date: NaiveDate) -> PathBuf {
+    pub fn generate_with_date(&mut self, date: NaiveDate) -> PathBuf {
         loop {
             let note_name = generate_note_name(date);
 
