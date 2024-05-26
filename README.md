@@ -11,7 +11,7 @@ Create notes in a directory (default `~/notes`):
 ```md
 This is a #test #note.
 
-You can #create #tags like this:
+You can #create #tags if you just put a #number-sign infront of the word:
 
     #this-is-a-tag
 
