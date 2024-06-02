@@ -4,7 +4,7 @@ use termfmt::TermFmt;
 
 use crate::config::Config;
 use crate::generate::NameGenerator;
-use crate::note::note_date;
+use crate::note::{note_date, note_header};
 use crate::output::{DataBundle, OutputData, OutputFmt};
 use crate::{is_valid_note_name, note_files, read_note_tags};
 
@@ -49,8 +49,7 @@ pub fn clean_notes(config: &Config, term: &mut TermFmt<OutputData, DataBundle>) 
             note
         };
 
-        let Ok(content) = fs::read_to_string(&note) else {
-            continue;
-        };
+        println!("{}", note.display());
+        note_header(&note);
     }
 }

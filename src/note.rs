@@ -4,11 +4,12 @@ use std::path::Path;
 use std::process::Command;
 
 use chrono::NaiveDate;
-use nom::bytes::complete::tag;
-use nom::character::complete::{char, u16, u8};
-use nom::sequence::delimited;
+use itertools::Itertools;
+use nom::branch::alt;
+use nom::bytes::complete::{tag, take_until};
+use nom::character::complete::{alphanumeric1, char, space0, u16, u8};
+use nom::sequence::{delimited, tuple};
 use nom::IResult;
-use termfmt::chrono::DateFmt;
 
 use crate::config::Config;
 
@@ -70,10 +71,15 @@ pub fn note_header(file: &Path) -> Option<String> {
         tag("---\n")(input)
     }
 
-    fn key_value_pair(input: &str) -> IResult<&str, &str> {
-        todo!()
+    fn key_value_pair(input: &str) -> IResult<&str, (&str, char, &str)> {
+        alt((
+            tuple((space0, char('-'), take_until("\n"))),
+            tuple((alphanumeric1, char(':'), take_until("\n"))),
+        ))(input)
     }
 
-    delimited(sep, key_value_pair, sep);
+    if delimited(sep, key_value_pair, sep)(&content).is_ok() {
+        println!("{}", content.lines().take(6).join("\n"));
+    }
     None
 }
