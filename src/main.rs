@@ -142,6 +142,13 @@ fn main() -> eyre::Result<()> {
                 let mut file_tags_match = true;
 
                 for tag in tags.iter() {
+                    let tag_already_found = found_tags
+                        .iter()
+                        .any(|note_tag: &String| note_tag.contains(tag.as_str()));
+                    if tag_already_found {
+                        continue;
+                    }
+
                     let tag_position = note_tags
                         .iter()
                         .position(|note_tag| note_tag.contains(tag.as_str()));
