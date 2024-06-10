@@ -2,7 +2,9 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use termfmt::{termarrow, termerr, termh1, terminfo, BundleFmt, DataFmt, TermFmt};
+use termfmt::{
+    termarrow, termarrow_fg, termerr, termh1, terminfo, BundleFmt, DataFmt, Fg, TermFmt,
+};
 
 use crate::config::Config;
 
@@ -13,7 +15,8 @@ pub enum OutputData {
     Command(String),
     File(PathBuf),
     List(ListEntry),
-    CleanupJustATest(ListEntry),
+    CleanupRemove(ListEntry),
+    CleanupRename(PathBuf),
     End,
 }
 
@@ -26,6 +29,10 @@ pub struct DataBundle {
     list_output: Vec<ListEntry>,
     #[serde(rename = "output", skip_serializing_if = "Vec::is_empty")]
     command_output: Vec<String>,
+    #[serde(rename = "remove", skip_serializing_if = "Vec::is_empty")]
+    cleanup_remove_output: Vec<ListEntry>,
+    #[serde(rename = "rename", skip_serializing_if = "Vec::is_empty")]
+    cleanup_rename_output: Vec<PathBuf>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     info: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -62,6 +69,16 @@ impl DataFmt for OutputData {
                     println!("{}|{}", file.display(), tags.join(","))
                 }
             }
+            OutputData::CleanupRemove(ListEntry { file, tags }) => {
+                if tags.is_empty() {
+                    println!("delete {}", file.display())
+                } else {
+                    println!("delete {}|{}", file.display(), tags.join(","))
+                }
+            }
+            OutputData::CleanupRename(file) => {
+                println!("rename {}", file.display())
+            }
             OutputData::Headline(_) | OutputData::End => {}
         }
     }
@@ -79,6 +96,12 @@ impl DataFmt for OutputData {
                     termarrow(tags.join(", "))
                 }
             }
+            OutputData::CleanupRemove(ListEntry { file, .. }) => {
+                termarrow_fg(Fg::Red, format_args!("delete: {}", file.display()));
+            }
+            OutputData::CleanupRename(file) => {
+                termarrow_fg(Fg::Yellow, format_args!("rename: {}", file.display()));
+            }
             OutputData::End => println!(),
         }
     }
@@ -93,10 +116,9 @@ impl BundleFmt for DataBundle {
             OutputData::List(value) => self.list_output.push(value),
             OutputData::Command(value) => self.command_output.push(value),
             OutputData::Info(value) => self.info.push(value),
-            OutputData::Error(_)
-            | OutputData::Headline(_)
-            | OutputData::CleanupJustATest(_)
-            | OutputData::End => {}
+            OutputData::CleanupRemove(value) => self.cleanup_remove_output.push(value),
+            OutputData::CleanupRename(value) => self.cleanup_rename_output.push(value),
+            OutputData::Error(_) | OutputData::Headline(_) | OutputData::End => {}
         }
     }
 
@@ -138,7 +160,8 @@ pub trait OutputFmt {
     fn file(&mut self, file: impl Into<PathBuf>);
     fn list(&mut self, file: impl Into<PathBuf>);
     fn list_with_tags(&mut self, file: impl Into<PathBuf>, tags: impl Into<Vec<String>>);
-    fn cleanup_just_a_test(&mut self, file: PathBuf, tags: Vec<String>);
+    fn cleanup_remove(&mut self, file: impl AsRef<Path>, tags: impl Into<Vec<String>>);
+    fn cleanup_rename(&mut self, file: impl AsRef<Path>);
     fn end(&mut self);
 }
 
@@ -185,8 +208,15 @@ impl OutputFmt for TermFmt<OutputData, DataBundle> {
         }));
     }
 
-    fn cleanup_just_a_test(&mut self, file: PathBuf, tags: Vec<String>) {
-        self.output(OutputData::CleanupJustATest(ListEntry { file, tags }));
+    fn cleanup_remove(&mut self, file: impl AsRef<Path>, tags: impl Into<Vec<String>>) {
+        self.output(OutputData::CleanupRemove(ListEntry {
+            file: file.as_ref().to_owned(),
+            tags: tags.into(),
+        }));
+    }
+
+    fn cleanup_rename(&mut self, file: impl AsRef<Path>) {
+        self.output(OutputData::CleanupRename(file.as_ref().to_owned()))
     }
 
     fn end(&mut self) {
