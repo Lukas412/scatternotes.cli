@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use termfmt::{termarrow, termerr, termheader, terminfo, BundleFmt, DataFmt, TermFmt};
+use termfmt::{termarrow, termerr, termh1, terminfo, BundleFmt, DataFmt, TermFmt};
 
 use crate::config::Config;
 
@@ -70,11 +70,11 @@ impl DataFmt for OutputData {
         match self {
             OutputData::Info(value) => terminfo(value),
             OutputData::Error(value) => termerr(value),
-            OutputData::Headline(value) => termheader(value),
+            OutputData::Headline(value) => termh1(value),
             OutputData::Command(value) => termarrow(value),
             OutputData::File(file) => termarrow(file.display()),
             OutputData::List(ListEntry { file, tags }) => {
-                termheader(file.display());
+                termh1(file.display());
                 if !tags.is_empty() {
                     termarrow(tags.join(", "))
                 }
