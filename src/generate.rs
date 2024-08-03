@@ -6,35 +6,32 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
 use crate::config::Config;
 
-pub struct NameGenerator<'a> {
+pub struct NameGenerator {
     existing: HashSet<PathBuf>,
-    config: &'a Config,
 }
 
-impl<'a> NameGenerator<'a> {
-    pub fn new(config: &'a Config) -> Self {
+impl NameGenerator {
+    pub fn new() -> Self {
         Self {
             existing: HashSet::new(),
-            config,
         }
     }
 
-    pub fn with_capacity(config: &'a Config, capacity: usize) -> Self {
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
             existing: HashSet::with_capacity(capacity),
-            config,
         }
     }
 
-    pub fn generate(&mut self) -> PathBuf {
-        self.generate_with_date(Local::now().date_naive())
+    pub fn generate(&mut self, config: &Config) -> PathBuf {
+        self.generate_with_date(Local::now().date_naive(), config)
     }
 
-    pub fn generate_with_date(&mut self, date: NaiveDate) -> PathBuf {
+    pub fn generate_with_date(&mut self, date: NaiveDate, config: &Config) -> PathBuf {
         loop {
             let note_name = generate_note_name(date);
 
-            let note_path = self.config.path().join(&note_name);
+            let note_path = config.path().join(&note_name);
             if note_path.exists() {
                 continue;
             }

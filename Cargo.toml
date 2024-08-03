@@ -2,7 +2,7 @@
 name = "scatternotes"
 version = "0.1.3"
 edition = "2021"
-description = "a cli application to manage unstructured notes."
+description = "A cli application to manage unstructured notes."
 license = "MIT"
 
 [dependencies]
