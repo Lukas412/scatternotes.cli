@@ -11,6 +11,7 @@ use config::Config;
 use nom::{
     bytes::complete::{tag, take_while_m_n},
     character::complete::{char, digit1},
+    multi::many_m_n,
     sequence::tuple,
     IResult,
 };
@@ -26,7 +27,6 @@ mod clean;
 mod commit;
 mod config;
 mod generate;
-mod note;
 mod output;
 
 fn main() -> eyre::Result<()> {
@@ -219,7 +219,6 @@ fn is_valid_note_name(note_path: &Path) -> bool {
             |char| matches!(char, 'a'..='z' | 'A'..='Z' | '0'..='9'),
         )(input)
     }
-
     let mut note_name_parser = tuple((date, char('_'), key, tag(".md")));
     note_name_parser(note_name).is_ok()
 }
