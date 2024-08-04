@@ -41,7 +41,7 @@ impl Tag {
         result
     }
 
-    fn parse_single(input: &str) -> Option<(&str, Tag)> {
+    pub fn parse_single(input: &str) -> Option<(&str, Tag)> {
         let (start, input) = input.split_at(1);
         let text: String = input.chars().take_while(valid_tag_char).collect();
         if text.is_empty() {

@@ -7,6 +7,10 @@ use termfmt::{termarrow, termarrow_fg, termerr, termh1, termh2, terminfo, Bundle
 use crate::config::Config;
 use crate::note::{Note, Tag};
 
+use self::tags::pretty_print_with_tags;
+
+mod tags;
+
 pub type Term = TermFmt<DataBundle>;
 
 #[derive(Default, Serialize)]
@@ -193,7 +197,7 @@ impl OutputFmt for TermFmt<DataBundle> {
         }
         if self.is_interactive() {
             termh1(file.as_ref().display());
-            println!("{}", content);
+            pretty_print_with_tags(content);
         }
     }
 
