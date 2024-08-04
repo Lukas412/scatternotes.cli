@@ -7,7 +7,16 @@ use serde::Serialize;
 pub enum Tag {
     Name(String),
     Person(String),
-    Todo { done: bool },
+    Todo(TodoTag),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum TodoTag {
+    Asap,
+    Todo,
+    Done,
+    Remind,
+    Review,
 }
 
 impl Tag {
@@ -40,11 +49,20 @@ impl Tag {
         }
         let remaining = &input[text.len()..];
         if start == "#" {
+            if text == "asap" {
+                return Some((remaining, Tag::Todo(TodoTag::Asap)));
+            }
             if text == "todo" {
-                return Some((remaining, Tag::Todo { done: false }));
+                return Some((remaining, Tag::Todo(TodoTag::Todo)));
             }
             if text == "done" {
-                return Some((remaining, Tag::Todo { done: true }));
+                return Some((remaining, Tag::Todo(TodoTag::Done)));
+            }
+            if text == "review" {
+                return Some((remaining, Tag::Todo(TodoTag::Review)));
+            }
+            if text == "remind" {
+                return Some((remaining, Tag::Todo(TodoTag::Remind)));
             }
             return Some((remaining, Tag::Name(text)));
         }
@@ -58,8 +76,7 @@ impl Tag {
         match self {
             Tag::Name(value) => value,
             Tag::Person(value) => value,
-            Tag::Todo { done: false } => "todo",
-            Tag::Todo { done: true } => "done",
+            Tag::Todo(value) => value.text(),
         }
     }
 }
@@ -76,4 +93,16 @@ impl Display for Tag {
 
 fn valid_tag_char(char: &char) -> bool {
     matches!(char, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '+' | '=' | 'ä' | 'Ä' | 'ö' | 'Ö' | 'ü' | 'Ü' | 'ß' )
+}
+
+impl TodoTag {
+    pub fn text(&self) -> &str {
+        match self {
+            TodoTag::Asap => "asap",
+            TodoTag::Todo => "todo",
+            TodoTag::Done => "done",
+            TodoTag::Remind => "remind",
+            TodoTag::Review => "review",
+        }
+    }
 }

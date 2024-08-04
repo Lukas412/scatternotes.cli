@@ -1,13 +1,16 @@
 use std::process::{Command, Stdio};
 
-use termfmt::{CommandOutputError, CommandStatusError, TermFmt};
+use termfmt::{CommandOutputError, CommandStatusError};
 
-use crate::{
-    config::Config,
-    output::{DataBundle, OutputData, OutputFmt},
-};
+use crate::config::Config;
+use crate::output::{OutputFmt, Term};
 
-pub fn commit_notes<'a>(config: &Config, term: &mut TermFmt<OutputData, DataBundle>) {
+pub const NAME: &'static str = "commit";
+
+pub fn command() -> clap::Command {
+    clap::Command::new("commit").about("commit the changes using git and push them to the remote")
+}
+pub fn run(term: &mut Term, config: &Config) {
     term.headline("RUNNING");
     term.command("git status --short");
     let Ok(stdout) = Command::new("git")

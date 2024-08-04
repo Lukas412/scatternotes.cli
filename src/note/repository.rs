@@ -55,32 +55,33 @@ impl NotesRepository {
             .filter_map(|path| Note::load(path).ok());
         Ok(result)
     }
-}
 
-pub fn note_date(config: &Config, file: &Path) -> Option<NaiveDate> {
-    if let Some(date) = file
-        .file_name()
-        .and_then(OsStr::to_str)
-        .and_then(search_date)
-    {
-        return Some(date);
-    }
-    fs::read_to_string(file)
-        .ok()
-        .and_then(|content| search_date(&content))
-        .or_else(|| git_log_first_date(config, file))
-}
-
-fn search_date(input: &str) -> Option<NaiveDate> {
-    for (index, _) in input.char_indices() {
-        if let Some(date) = date(&input[index..]) {
+    /// Determine note date by searching in the following order:
+    /// - in the note filename
+    /// - the content of the file
+    /// - the git history when the file was added
+    pub fn search_date(&self, config: &Config, file: &Path) -> Option<NaiveDate> {
+        if let Some(date) = file
+            .file_name()
+            .and_then(OsStr::to_str)
+            .and_then(search_date_in_text)
+        {
             return Some(date);
         }
+        fs::read_to_string(file)
+            .ok()
+            .and_then(|content| search_date_in_text(&content))
+            .or_else(|| git_log_first_date(config, file))
     }
-    None
 }
 
-fn date(input: &str) -> Option<NaiveDate> {
+fn search_date_in_text(input: &str) -> Option<NaiveDate> {
+    input
+        .char_indices()
+        .find_map(|(index, _)| parse_date(&input[index..]))
+}
+
+fn parse_date(input: &str) -> Option<NaiveDate> {
     fn date_impl(input: &str) -> IResult<&str, Option<NaiveDate>> {
         let (input, year) = u16(input)?;
         let (input, _) = char('-')(input)?;
@@ -104,26 +105,6 @@ fn git_log_first_date(config: &Config, file: &Path) -> Option<NaiveDate> {
         .output()
         .ok()?;
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let date = search_date(&stdout);
+    let date = search_date_in_text(&stdout);
     date
-}
-
-pub fn note_header(file: &Path) -> Option<String> {
-    let content = fs::read_to_string(file).ok()?;
-
-    fn sep(input: &str) -> IResult<&str, &str> {
-        tag("---\n")(input)
-    }
-
-    fn key_value_pair(input: &str) -> IResult<&str, (&str, char, &str)> {
-        alt((
-            tuple((space0, char('-'), take_until("\n"))),
-            tuple((alphanumeric1, char(':'), take_until("\n"))),
-        ))(input)
-    }
-
-    if delimited(sep, key_value_pair, sep)(&content).is_ok() {
-        println!("{}", content.lines().take(6).join("\n"));
-    }
-    None
 }

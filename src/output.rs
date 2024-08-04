@@ -2,30 +2,18 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use termfmt::{
-    termarrow, termarrow_fg, termerr, termh1, terminfo, BundleFmt, DataFmt, Fg, TermFmt,
-};
+use termfmt::{termarrow, termarrow_fg, termerr, termh1, terminfo, BundleFmt, Fg, TermFmt};
 
 use crate::config::Config;
 use crate::note::{Note, Tag};
 
-pub enum OutputData {
-    Info(String),
-    Error(String),
-    Headline(String),
-    Command(String),
-    File(PathBuf),
-    List(ListEntry),
-    CleanupRemove(ListEntry),
-    CleanupRename(PathBuf),
-    End,
-}
+pub type Term = TermFmt<DataBundle>;
 
 #[derive(Default, Serialize)]
 pub struct DataBundle {
     config: Option<Config>,
     #[serde(rename = "output", skip_serializing_if = "Vec::is_empty")]
-    generate_output: Vec<PathBuf>,
+    file_output: Vec<PathBuf>,
     #[serde(rename = "output", skip_serializing_if = "Vec::is_empty")]
     list_output: Vec<ListEntry>,
     #[serde(rename = "output", skip_serializing_if = "Vec::is_empty")]
@@ -35,6 +23,8 @@ pub struct DataBundle {
     #[serde(rename = "rename", skip_serializing_if = "Vec::is_empty")]
     cleanup_rename_output: Vec<PathBuf>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    hint: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     info: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     error: Vec<String>,
@@ -42,187 +32,148 @@ pub struct DataBundle {
 
 #[derive(Serialize)]
 pub struct ListEntry {
-    #[serde(skip)]
-    note: Note,
     file: PathBuf,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tags: Vec<Tag>,
 }
 
-impl DataBundle {
-    pub fn new(config: Config) -> Self {
+impl BundleFmt for DataBundle {
+    type Config = Config;
+
+    fn new(config: Config) -> Self {
         Self {
             config: Some(config),
             ..Default::default()
         }
     }
-}
-
-impl DataFmt for OutputData {
-    fn plain(self) {
-        match self {
-            OutputData::Info(value) => println!("{}", value),
-            OutputData::Error(value) => eprintln!("{}", value),
-            OutputData::Command(value) => println!("{}", value),
-            OutputData::File(file) => println!("{}", file.display()),
-            OutputData::List(ListEntry { note, file, tags }) => {
-                if tags.is_empty() {
-                    println!("{}", file.display())
-                } else {
-                    println!("{}|{}", file.display(), note.join_tags(",").unwrap())
-                }
-            }
-            OutputData::CleanupRemove(ListEntry { note, file, tags }) => {
-                if tags.is_empty() {
-                    println!("delete {}", file.display())
-                } else {
-                    println!(
-                        "delete {}|{}",
-                        file.display(),
-                        note.join_tags(", ").unwrap()
-                    )
-                }
-            }
-            OutputData::CleanupRename(file) => {
-                println!("rename {}", file.display())
-            }
-            OutputData::Headline(_) | OutputData::End => {}
-        }
-    }
-
-    fn interactive(self) {
-        match self {
-            OutputData::Info(value) => terminfo(value),
-            OutputData::Error(value) => termerr(value),
-            OutputData::Headline(value) => termh1(value),
-            OutputData::Command(value) => termarrow(value),
-            OutputData::File(file) => termarrow(file.display()),
-            OutputData::List(ListEntry { note, file, tags }) => {
-                termh1(file.display());
-                if !tags.is_empty() {
-                    termarrow(note.join_tags(", ").unwrap())
-                }
-            }
-            OutputData::CleanupRemove(ListEntry { file, .. }) => {
-                termarrow_fg(Fg::Red, format_args!("delete: {}", file.display()));
-            }
-            OutputData::CleanupRename(file) => {
-                termarrow_fg(Fg::Yellow, format_args!("rename: {}", file.display()));
-            }
-            OutputData::End => println!(),
-        }
-    }
-}
-
-impl BundleFmt for DataBundle {
-    type Data = OutputData;
-
-    fn push(&mut self, value: OutputData) {
-        match value {
-            OutputData::File(value) => self.generate_output.push(value),
-            OutputData::List(value) => self.list_output.push(value),
-            OutputData::Command(value) => self.command_output.push(value),
-            OutputData::Info(value) => self.info.push(value),
-            OutputData::CleanupRemove(value) => self.cleanup_remove_output.push(value),
-            OutputData::CleanupRename(value) => self.cleanup_rename_output.push(value),
-            OutputData::Error(_) | OutputData::Headline(_) | OutputData::End => {}
-        }
-    }
 
     fn clear(&mut self) {
-        self.generate_output.clear();
+        self.hint.clear();
+        self.info.clear();
+        self.error.clear();
+        self.file_output.clear();
         self.list_output.clear();
         self.command_output.clear();
-    }
-
-    fn csv<Writer>(&self, mut writer: csv::Writer<Writer>) -> eyre::Result<()>
-    where
-        Writer: std::io::Write,
-    {
-        for output in self.generate_output.iter() {
-            writer.serialize(output)?;
-        }
-        for output in self.list_output.iter() {
-            writer.serialize((output.file.clone(), output.note.join_tags(" ").unwrap()))?;
-        }
-        for output in self.command_output.iter() {
-            writer.serialize(output)?;
-        }
-        for output in self.info.iter() {
-            writer.serialize(output)?;
-        }
-        for output in self.error.iter() {
-            writer.serialize(output)?;
-        }
-        Ok(())
     }
 }
 
 pub trait OutputFmt {
+    fn hint(&mut self, value: impl Display);
     fn info(&mut self, value: impl Display);
     fn error(&mut self, value: impl Display);
     fn file_error(&mut self, file: impl AsRef<Path>, value: impl Display);
     fn headline(&mut self, value: impl Display);
     fn command(&mut self, value: &str);
-    fn file(&mut self, file: impl Into<PathBuf>);
+    fn file(&mut self, file: impl AsRef<Path>);
     fn list(&mut self, note: Note, with_tags: bool);
-    fn cleanup_remove(&mut self, note: Note, with_tags: bool);
+    fn cleanup_remove(&mut self, note: &Note, with_tags: bool);
     fn cleanup_rename(&mut self, note: &Note);
     fn end(&mut self);
 }
 
-impl OutputFmt for TermFmt<OutputData, DataBundle> {
+impl OutputFmt for TermFmt<DataBundle> {
+    fn hint(&mut self, value: impl Display) {
+        self.bundle(|bundle| bundle.hint.push(format!("{}", value)));
+        self.plain(&value);
+        if self.is_interactive() {
+            termarrow(value);
+        }
+    }
+
     fn info(&mut self, value: impl Display) {
-        self.output(OutputData::Info(format!("{}", value)));
+        self.bundle(|bundle| bundle.info.push(format!("{}", value)));
+        self.plain(&value);
+        if self.is_interactive() {
+            terminfo(value);
+        }
     }
 
     fn error(&mut self, value: impl Display) {
-        self.output(OutputData::Error(format!("{}", value)));
+        self.bundle(|bundle| bundle.error.push(format!("{}", value)));
+        self.plain(&value);
+        if self.is_interactive() {
+            termerr(value);
+        }
     }
 
     fn file_error(&mut self, file: impl AsRef<Path>, value: impl Display) {
-        self.output(OutputData::Error(format!(
-            "{}: {}",
-            file.as_ref().display(),
-            value
-        )));
+        self.error(format_args!("{}: {}", file.as_ref().display(), value));
     }
 
     fn headline(&mut self, value: impl Display) {
-        self.output(OutputData::Headline(format!("{}", value)));
+        if self.is_interactive() {
+            termh1(format_args!("{}", value));
+        }
     }
 
     fn command(&mut self, value: &str) {
-        self.output(OutputData::Command(value.to_owned()))
+        self.bundle(|bundle| bundle.command_output.push(value.to_owned()));
+        self.plain(value);
+        if self.is_interactive() {
+            termarrow(value);
+        }
     }
 
-    fn file(&mut self, file: impl Into<PathBuf>) {
-        self.output(OutputData::File(file.into()));
+    fn file(&mut self, file: impl AsRef<Path>) {
+        self.bundle(|bundle| bundle.file_output.push(file.as_ref().to_owned()));
+        self.plain(file.as_ref().display());
+        if self.is_interactive() {
+            termarrow(file.as_ref().display());
+        }
     }
 
     fn list(&mut self, note: Note, with_tags: bool) {
-        let tags = with_tags.then(|| note.tags().to_vec()).unwrap_or_default();
-        self.output(OutputData::List(ListEntry {
-            file: note.path().to_owned(),
-            note,
-            tags,
-        }));
+        self.bundle(|bundle| {
+            bundle.list_output.push(ListEntry {
+                file: note.path().to_owned(),
+                tags: with_tags.then(|| note.tags().to_vec()).unwrap_or_default(),
+            })
+        });
+        if self.is_plain() {
+            print!("{}", note.path().display());
+            if with_tags {
+                print!("|{}", note.join_tags(",").unwrap());
+            }
+            println!();
+        }
+        if self.is_interactive() {
+            termh1(note.path().display());
+            if with_tags {
+                termarrow(note.join_tags(", ").unwrap());
+            }
+        }
     }
 
-    fn cleanup_remove(&mut self, note: Note, with_tags: bool) {
-        let tags = with_tags.then(|| note.tags().to_vec()).unwrap_or_default();
-        self.output(OutputData::CleanupRemove(ListEntry {
-            file: note.path().to_owned(),
-            note,
-            tags,
-        }));
+    fn cleanup_remove(&mut self, note: &Note, with_tags: bool) {
+        self.bundle(|bundle| {
+            bundle.cleanup_remove_output.push(ListEntry {
+                file: note.path().to_owned(),
+                tags: with_tags.then(|| note.tags().to_vec()).unwrap_or_default(),
+            })
+        });
+        if self.is_plain() {
+            print!("delete {}", note.path().display());
+            if with_tags {
+                print!("|{}", note.join_tags(",").unwrap());
+            }
+            println!();
+        }
+        if self.is_interactive() {
+            termarrow_fg(Fg::Red, note.path().display());
+        }
     }
 
     fn cleanup_rename(&mut self, note: &Note) {
-        self.output(OutputData::CleanupRename(note.path().to_owned()))
+        self.bundle(|bundle| bundle.cleanup_rename_output.push(note.path().to_owned()));
+        self.plain(format_args!("rename {}", note.path().display()));
+        if self.is_interactive() {
+            termarrow_fg(Fg::Yellow, note.path().display());
+        }
     }
 
     fn end(&mut self) {
-        self.output(OutputData::End);
+        if self.is_interactive() {
+            println!();
+        }
     }
 }

@@ -4,8 +4,10 @@ use std::mem;
 use std::path::{Path, PathBuf};
 
 pub use self::tag::Tag;
+use self::todo::Todo;
 
 mod tag;
+mod todo;
 
 #[derive(Clone)]
 pub struct Note {
@@ -15,14 +17,6 @@ pub struct Note {
 }
 
 impl Note {
-    pub fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-            tags: Vec::new(),
-            content: String::new(),
-        }
-    }
-
     pub fn load(path: PathBuf) -> eyre::Result<Self> {
         let content = read_to_string(&path)?;
         let tags = Tag::parse_all(&content);
@@ -41,10 +35,6 @@ impl Note {
         &self.tags
     }
 
-    pub fn content(&self) -> &str {
-        &self.content
-    }
-
     pub fn join_tags(&self, separator: &str) -> eyre::Result<String> {
         let mut b = String::new();
         let mut iter = self.tags.iter();
@@ -55,6 +45,19 @@ impl Note {
             write!(b, "{}{}", separator, tag)?;
         }
         Ok(b)
+    }
+
+    pub fn todos(&self) -> impl Iterator<Item = Todo> {
+        self.parts().filter_map(|part| Todo::parse(part))
+    }
+}
+
+impl Note {
+    fn parts(&self) -> impl Iterator<Item = &str> {
+        self.content
+            .split("\n\n")
+            .map(|part| part.trim())
+            .filter(|part| !part.is_empty())
     }
 }
 

@@ -1,17 +1,18 @@
 use std::fs;
 
-use termfmt::TermFmt;
-
 use crate::config::Config;
 use crate::is_valid_note_name;
-use crate::note::{note_date, note_header, NotesRepository};
-use crate::output::{DataBundle, OutputData, OutputFmt};
+use crate::note::NotesRepository;
+use crate::output::{OutputFmt, Term};
+use crate::NameGenerator;
 
-pub fn clean_notes(
-    config: &Config,
-    notes_repository: &NotesRepository,
-    term: &mut TermFmt<OutputData, DataBundle>,
-) {
+pub const NAME: &'static str = "clean";
+
+pub fn command() -> clap::Command {
+    clap::Command::new(NAME).about("clean the notes directory")
+}
+
+pub fn run(term: &mut Term, config: &Config, notes_repository: &NotesRepository) {
     term.headline("CLEANUP NOTES");
 
     let Ok(notes) = notes_repository.all_notes() else {
@@ -19,22 +20,26 @@ pub fn clean_notes(
         return;
     };
 
+    let mut changes_done = false;
     for note in notes {
         if note.tags().iter().any(|tag| tag.text() == "just-a-test") {
-            term.cleanup_remove(note.clone(), true);
+            changes_done = true;
+            term.cleanup_remove(&note, true);
             if let Err(error) = fs::remove_file(note.path()) {
                 term.error(error);
             };
             continue;
         }
 
+        let mut generator = NameGenerator::new();
         let note = if !is_valid_note_name(note.path()) {
+            changes_done = true;
             term.cleanup_rename(&note);
-            let Some(date) = note_date(config, note.path()) else {
+            let Some(date) = notes_repository.search_date(config, note.path()) else {
                 term.error("could not get date of note!");
                 continue;
             };
-            let new_note = generator.generate_with_date(date);
+            let new_note = generator.generate_with_date(date, config);
             if let Err(error) = fs::rename(note.path(), &new_note) {
                 term.error(error);
                 continue;
@@ -44,7 +49,10 @@ pub fn clean_notes(
             note.path().to_owned()
         };
 
-        println!("{}", note.display());
-        note_header(&note);
+        //note_header(&note);
+    }
+
+    if !changes_done {
+        term.hint("no changes done");
     }
 }

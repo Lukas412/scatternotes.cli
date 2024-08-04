@@ -2,7 +2,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use chrono::{Local, NaiveDate};
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 
 use crate::config::Config;
 
