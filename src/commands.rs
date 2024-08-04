@@ -44,7 +44,7 @@ pub fn run(command: ArgMatches) {
         generate::NAME => generate::run(command, &mut term, &config),
         list::NAME => list::run(command, &mut term, &config, &notes_repository),
         search::NAME => search::run(command, &mut term, &notes_repository),
-        todo::NAME => todo::run(command, &mut term, &config),
+        todo::NAME => todo::run(command, &mut term, &notes_repository),
         _ => term.error(format_args!("command not implemented: {}", name)),
     }
 

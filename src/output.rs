@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use termfmt::{termarrow, termarrow_fg, termerr, termh1, terminfo, BundleFmt, Fg, TermFmt};
+use termfmt::{termarrow, termarrow_fg, termerr, termh1, termh2, terminfo, BundleFmt, Fg, TermFmt};
 
 use crate::config::Config;
 use crate::note::{Note, Tag};
@@ -15,13 +15,15 @@ pub struct DataBundle {
     #[serde(rename = "output", skip_serializing_if = "Vec::is_empty")]
     file_output: Vec<PathBuf>,
     #[serde(rename = "output", skip_serializing_if = "Vec::is_empty")]
-    list_output: Vec<ListEntry>,
+    list_output: Vec<ListEntryFmt>,
     #[serde(rename = "output", skip_serializing_if = "Vec::is_empty")]
     command_output: Vec<String>,
     #[serde(rename = "remove", skip_serializing_if = "Vec::is_empty")]
-    cleanup_remove_output: Vec<ListEntry>,
+    cleanup_remove_output: Vec<ListEntryFmt>,
     #[serde(rename = "rename", skip_serializing_if = "Vec::is_empty")]
     cleanup_rename_output: Vec<PathBuf>,
+    #[serde(rename = "todos", skip_serializing_if = "Vec::is_empty")]
+    todos_output: Vec<TodoFmt>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     hint: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -31,10 +33,16 @@ pub struct DataBundle {
 }
 
 #[derive(Serialize)]
-pub struct ListEntry {
+pub struct ListEntryFmt {
     file: PathBuf,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tags: Vec<Tag>,
+}
+
+#[derive(Serialize)]
+pub struct TodoFmt {
+    file: PathBuf,
+    content: String,
 }
 
 impl BundleFmt for DataBundle {
@@ -68,6 +76,7 @@ pub trait OutputFmt {
     fn list(&mut self, note: Note, with_tags: bool);
     fn cleanup_remove(&mut self, note: &Note, with_tags: bool);
     fn cleanup_rename(&mut self, note: &Note);
+    fn todo(&mut self, file: impl AsRef<Path>, content: &str);
     fn end(&mut self);
 }
 
@@ -124,7 +133,7 @@ impl OutputFmt for TermFmt<DataBundle> {
 
     fn list(&mut self, note: Note, with_tags: bool) {
         self.bundle(|bundle| {
-            bundle.list_output.push(ListEntry {
+            bundle.list_output.push(ListEntryFmt {
                 file: note.path().to_owned(),
                 tags: with_tags.then(|| note.tags().to_vec()).unwrap_or_default(),
             })
@@ -146,7 +155,7 @@ impl OutputFmt for TermFmt<DataBundle> {
 
     fn cleanup_remove(&mut self, note: &Note, with_tags: bool) {
         self.bundle(|bundle| {
-            bundle.cleanup_remove_output.push(ListEntry {
+            bundle.cleanup_remove_output.push(ListEntryFmt {
                 file: note.path().to_owned(),
                 tags: with_tags.then(|| note.tags().to_vec()).unwrap_or_default(),
             })
@@ -168,6 +177,23 @@ impl OutputFmt for TermFmt<DataBundle> {
         self.plain(format_args!("rename {}", note.path().display()));
         if self.is_interactive() {
             termarrow_fg(Fg::Yellow, note.path().display());
+        }
+    }
+
+    fn todo(&mut self, file: impl AsRef<Path>, content: &str) {
+        self.bundle(|bundle| {
+            bundle.todos_output.push(TodoFmt {
+                file: file.as_ref().to_owned(),
+                content: content.to_owned(),
+            })
+        });
+        if self.is_plain() {
+            println!("{}", file.as_ref().display());
+            println!("{}", content);
+        }
+        if self.is_interactive() {
+            termh1(file.as_ref().display());
+            println!("{}", content);
         }
     }
 

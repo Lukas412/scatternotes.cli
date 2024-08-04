@@ -5,15 +5,17 @@ use crate::output::{OutputFmt, Term};
 
 pub const NAME: &'static str = "search";
 
+pub const ARG_QUERIES: &'static str = "queries";
+pub const ARG_TAGS: &'static str = "tags";
+
 pub fn command() -> Command {
-    Command::new("search")
+    Command::new(NAME)
         .args([
-            Arg::new("tags")
+            Arg::new(ARG_QUERIES)
                 .num_args(1..)
                 .help("the tags to search for. (the tags are additive)"),
-            Arg::new("show-tags")
-                .short('t')
-                .long("show-tags")
+            Arg::new(ARG_TAGS)
+                .long(ARG_TAGS)
                 .action(ArgAction::SetTrue)
                 .help("display the tags of the notes, which matched the search parameters"),
         ])
@@ -21,7 +23,7 @@ pub fn command() -> Command {
 }
 
 pub fn run(command: &ArgMatches, term: &mut Term, notes_repository: &NotesRepository) {
-    let Some(tags) = command.get_many::<String>("tags") else {
+    let Some(tags) = command.get_many::<String>(ARG_QUERIES) else {
         term.error("please provide tags to search by!");
         term.end();
         return;
@@ -34,7 +36,7 @@ pub fn run(command: &ArgMatches, term: &mut Term, notes_repository: &NotesReposi
         return;
     };
 
-    let show_tags = command.get_flag("show-tags");
+    let show_tags = command.get_flag(ARG_TAGS);
     for note in notes {
         term.list(note, show_tags);
     }
