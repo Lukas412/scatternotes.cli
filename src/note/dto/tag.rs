@@ -8,15 +8,24 @@ pub enum Tag {
     Name(String),
     Person(String),
     Todo(TodoTag),
+    Action(ActionTag),
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub enum TodoTag {
-    Asap,
     Todo,
     Done,
+    Idea,
+    MustDo,
+    Asap,
     Remind,
     Review,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum ActionTag {
+    Load,
+    Expand,
 }
 
 impl Tag {
@@ -48,28 +57,29 @@ impl Tag {
             return None;
         }
         let remaining = &input[text.len()..];
-        if start == "#" {
-            if text == "asap" {
-                return Some((remaining, Tag::Todo(TodoTag::Asap)));
-            }
-            if text == "todo" {
-                return Some((remaining, Tag::Todo(TodoTag::Todo)));
-            }
-            if text == "done" {
-                return Some((remaining, Tag::Todo(TodoTag::Done)));
-            }
-            if text == "review" {
-                return Some((remaining, Tag::Todo(TodoTag::Review)));
-            }
-            if text == "remind" {
-                return Some((remaining, Tag::Todo(TodoTag::Remind)));
-            }
-            return Some((remaining, Tag::Name(text)));
+        let todo_result = |tag| Some((remaining, Tag::Todo(tag)));
+        return match (start, text.as_str()) {
+            ("#", "todo") => todo_result(TodoTag::Todo),
+            ("#", "done") => todo_result(TodoTag::Done),
+            ("#", "idea") => todo_result(TodoTag::Idea),
+            ("#", "must-do") => todo_result(TodoTag::MustDo),
+            ("#", "asap") => todo_result(TodoTag::Asap),
+            ("#", "review") => todo_result(TodoTag::Review),
+            ("#", "remind") => todo_result(TodoTag::Remind),
+            ("#", _) => Some((remaining, Tag::Name(text))),
+            ("~", "load") => Some((remaining, Tag::Action(ActionTag::Load))),
+            ("~", "expand") => Some((remaining, Tag::Action(ActionTag::Expand))),
+            ("@", _) => Some((remaining, Tag::Person(text))),
+            _ => None,
+        };
+    }
+
+    pub fn prefix(&self) -> char {
+        match self {
+            Self::Name(_) | Self::Todo(_) => '#',
+            Self::Person(_) => '@',
+            Self::Action(_) => '~',
         }
-        if start == "@" {
-            return Some((remaining, Tag::Person(text)));
-        }
-        None
     }
 
     pub fn text(&self) -> &str {
@@ -77,17 +87,14 @@ impl Tag {
             Tag::Name(value) => value,
             Tag::Person(value) => value,
             Tag::Todo(value) => value.text(),
+            Tag::Action(value) => value.text(),
         }
     }
 }
 
 impl Display for Tag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let start = match self {
-            Tag::Name(_) | Tag::Todo { .. } => '#',
-            Tag::Person(_) => '@',
-        };
-        write!(f, "{}{}", start, self.text())
+        write!(f, "{}{}", self.prefix(), self.text())
     }
 }
 
@@ -98,11 +105,22 @@ fn valid_tag_char(char: &char) -> bool {
 impl TodoTag {
     pub fn text(&self) -> &str {
         match self {
-            TodoTag::Asap => "asap",
-            TodoTag::Todo => "todo",
-            TodoTag::Done => "done",
-            TodoTag::Remind => "remind",
-            TodoTag::Review => "review",
+            Self::Todo => "todo",
+            Self::Done => "done",
+            Self::Idea => "idea",
+            Self::MustDo => "must-do",
+            Self::Asap => "asap",
+            Self::Remind => "remind",
+            Self::Review => "review",
+        }
+    }
+}
+
+impl ActionTag {
+    pub fn text(&self) -> &str {
+        match self {
+            Self::Load => "load",
+            Self::Expand => "expand",
         }
     }
 }

@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use termfmt::{termarrow, termarrow_fg, termerr, termh1, termh2, terminfo, BundleFmt, Fg, TermFmt};
+use termfmt::{termarrow, termarrow_fg, termerr, termh1, terminfo, BundleFmt, Fg, TermFmt};
 
 use crate::config::Config;
 use crate::note::{Note, Tag};

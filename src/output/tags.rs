@@ -4,7 +4,7 @@ use crate::note::Tag;
 
 pub fn pretty_print_with_tags(mut content: &str) {
     while !content.is_empty() {
-        let Some(index) = content.find('#') else {
+        let Some(index) = content.find(|char| matches!(char, '#' | '@')) else {
             print!("{}", content);
             break;
         };
@@ -12,8 +12,11 @@ pub fn pretty_print_with_tags(mut content: &str) {
         content = &content[index..];
         if let Some((remaining, tag)) = Tag::parse_single(content) {
             content = remaining;
-            print!("{}", format_args!("#{}", tag.text()).fg_blue());
+            print!("{}", format_args!("{}", tag).fg_blue());
         };
     }
     println!();
 }
+
+
+
