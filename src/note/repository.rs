@@ -4,11 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 use chrono::NaiveDate;
-use itertools::Itertools;
-use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until};
-use nom::character::complete::{alphanumeric1, char, space0, u16, u8};
-use nom::sequence::{delimited, tuple};
+use nom::character::complete::{char, u16, u8};
 use nom::IResult;
 
 use crate::config::Config;
@@ -32,7 +28,7 @@ impl NotesRepository {
         Ok(self.all_notes()?.filter_map(|mut note| {
             let matches = queries
                 .iter()
-                .all(|query| note.tags().iter().any(|tag| tag.text().contains(*query)));
+                .all(|query| note.tags().any(|tag| tag.text().contains(*query)));
             if !matches {
                 return None;
             }
@@ -52,7 +48,7 @@ impl NotesRepository {
                     .map(|extension| extension == "md")
                     .unwrap_or(false)
             })
-            .filter_map(|path| Note::load(path).ok());
+            .flat_map(|path| Note::load(path).ok());
         Ok(result)
     }
 

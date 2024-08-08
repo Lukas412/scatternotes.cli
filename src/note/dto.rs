@@ -1,6 +1,6 @@
+use std::collections::HashSet;
 use std::fmt::Write;
 use std::fs::read_to_string;
-use std::mem;
 use std::path::{Path, PathBuf};
 
 pub use self::tag::Tag;
@@ -12,7 +12,7 @@ mod todo;
 #[derive(Clone)]
 pub struct Note {
     path: PathBuf,
-    tags: Vec<Tag>,
+    tags: HashSet<Tag>,
     content: String,
 }
 
@@ -31,8 +31,8 @@ impl Note {
         &self.path
     }
 
-    pub fn tags(&self) -> &[Tag] {
-        &self.tags
+    pub fn tags(&self) -> impl Iterator<Item = &Tag> {
+        self.tags.iter()
     }
 
     pub fn join_tags(&self, separator: &str) -> eyre::Result<String> {

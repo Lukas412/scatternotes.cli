@@ -139,7 +139,9 @@ impl OutputFmt for TermFmt<DataBundle> {
         self.bundle(|bundle| {
             bundle.list_output.push(ListEntryFmt {
                 file: note.path().to_owned(),
-                tags: with_tags.then(|| note.tags().to_vec()).unwrap_or_default(),
+                tags: with_tags
+                    .then(|| note.tags().cloned().collect())
+                    .unwrap_or_default(),
             })
         });
         if self.is_plain() {
@@ -161,7 +163,9 @@ impl OutputFmt for TermFmt<DataBundle> {
         self.bundle(|bundle| {
             bundle.cleanup_remove_output.push(ListEntryFmt {
                 file: note.path().to_owned(),
-                tags: with_tags.then(|| note.tags().to_vec()).unwrap_or_default(),
+                tags: with_tags
+                    .then(|| note.tags().cloned().collect())
+                    .unwrap_or_default(),
             })
         });
         if self.is_plain() {

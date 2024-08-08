@@ -1,9 +1,11 @@
+use std::collections::HashSet;
+
 use super::tag::TodoTag;
 use super::Tag;
 
 pub struct Todo<'a> {
     content: &'a str,
-    tags: Vec<Tag>,
+    tags: HashSet<Tag>,
 }
 
 impl<'a> Todo<'a> {

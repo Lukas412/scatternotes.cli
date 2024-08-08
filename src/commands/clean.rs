@@ -22,7 +22,9 @@ pub fn run(term: &mut Term, config: &Config, notes_repository: &NotesRepository)
 
     let mut changes_done = false;
     for note in notes {
-        if note.tags().iter().any(|tag| tag.text() == "just-a-test") {
+        if 
+        
+        if note.tags().any(|tag| tag.text() == "just-a-test") {
             changes_done = true;
             term.cleanup_remove(&note, true);
             if let Err(error) = fs::remove_file(note.path()) {
@@ -48,8 +50,6 @@ pub fn run(term: &mut Term, config: &Config, notes_repository: &NotesRepository)
         } else {
             note.path().to_owned()
         };
-
-        //note_header(&note);
     }
 
     if !changes_done {
