@@ -60,7 +60,11 @@ impl<'a> Tag<'a> {
         if text.is_empty() {
             return Err("");
         }
-        let remaining = &input[text.len()..];
+        let remaining = if input.len() > text.len() {
+            &input[text.len()..]
+        } else {
+            ""
+        };
         let todo = |tag| Ok((preceding, remaining, Tag::Todo(tag)));
         let action = |tag| Ok((preceding, remaining, Tag::Action(tag)));
         return match (start, text) {
@@ -100,6 +104,10 @@ impl<'a> Tag<'a> {
 
     pub fn contains(&self, other: &str) -> bool {
         self.text().contains(other)
+    }
+
+    pub fn is_person(&self) -> bool {
+        matches!(self, Self::Person(_))
     }
 }
 

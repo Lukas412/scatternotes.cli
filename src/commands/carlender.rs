@@ -44,7 +44,7 @@ pub fn run(command: &ArgMatches, term: &mut Term, config: &Config) {
     match command.subcommand().unwrap() {
         ("get", command) => {
             let dates = command.get_many::<String>(ARG_DAY).unwrap();
-            run_get(term, config, dates.into_iter().map());
+            // run_get(term, config, dates.into_iter());
         }
         (name, _) => {
             term.error(format_args!(

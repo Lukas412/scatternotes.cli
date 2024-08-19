@@ -1,5 +1,10 @@
-use clap::{ArgMatches, Command};
+use std::collections::HashSet;
 
+use clap::{ArgMatches, Command};
+use itertools::Itertools;
+
+use crate::config::Config;
+use crate::note::Note;
 use crate::output::{OutputFmt, Term};
 
 pub const NAME: &str = "persons";
@@ -17,9 +22,20 @@ pub fn command() -> Command {
         .about("manage the persons in your notes")
 }
 
-pub fn run(command: &ArgMatches, term: &mut Term) {
+pub fn run(command: &ArgMatches, term: &mut Term, config: &Config) {
     match command.subcommand().unwrap() {
-        (CMD_INDEX, _) => {}
+        (CMD_INDEX, _) => {
+            let mut persons = HashSet::new();
+            for note in Note::all_notes(config).unwrap() {
+                for person in note.persons() {
+                    if persons.get(person).is_some() {
+                        continue;
+                    }
+                    persons.insert(person.to_owned());
+                }
+            }
+            println!("{}", persons.iter().join(", "));
+        }
         (name, _) => term.error(format_args!(
             "command '{} {}' is not implemented",
             NAME, name

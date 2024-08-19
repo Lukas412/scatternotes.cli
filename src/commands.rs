@@ -22,6 +22,7 @@ pub fn list() -> impl IntoIterator<Item = Command> {
         commit::command(),
         generate::command(),
         list::command(),
+        persons::command(),
         search::command(),
         todo::command(),
     ]
@@ -38,12 +39,13 @@ pub fn run(command: ArgMatches) {
     };
 
     match name {
-        carlender::NAME => carlender::run(command, &mut term),
+        carlender::NAME => carlender::run(command, &mut term, &config),
         clean::NAME => clean::run(&mut term, &config),
         code::NAME => code::run(command, &mut term, &config),
         commit::NAME => commit::run(&mut term, &config),
         generate::NAME => generate::run(command, &mut term, &config),
         list::NAME => list::run(command, &mut term, &config),
+        persons::NAME => persons::run(command, &mut term, &config),
         search::NAME => search::run(command, &mut term, &config),
         todo::NAME => todo::run(command, &mut term, &config),
         _ => term.error(format_args!("command not implemented: {}", name)),

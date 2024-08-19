@@ -93,6 +93,12 @@ impl Note {
         join_tags_impl(iter, separator)
     }
 
+    pub fn persons(&self) -> impl Iterator<Item = &str> {
+        self.tags
+            .iter()
+            .filter_map(|tag| tag.is_person().then(|| tag.text()))
+    }
+
     pub fn parts(&self) -> impl Iterator<Item = &str> {
         self.content
             .split("\n\n")
