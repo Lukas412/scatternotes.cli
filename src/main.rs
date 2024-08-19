@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::path::Path;
 
 use clap::Command;
@@ -11,11 +13,15 @@ use termfmt::TermFmtsExt;
 
 use self::name::NameGenerator;
 
+mod carlender;
+mod code;
 mod commands;
 mod config;
 mod name;
 mod note;
 mod output;
+mod tag;
+mod todo;
 
 fn main() -> eyre::Result<()> {
     let cli = Command::new(env!("CARGO_PKG_NAME"))

@@ -5,7 +5,7 @@ use serde::Serialize;
 use termfmt::{termarrow, termarrow_fg, termerr, termh1, terminfo, BundleFmt, Fg, TermFmt};
 
 use crate::config::Config;
-use crate::note::{Note, Tag};
+use crate::note::Note;
 
 use self::tags::pretty_print_with_tags;
 
@@ -40,7 +40,7 @@ pub struct DataBundle {
 pub struct ListEntryFmt {
     file: PathBuf,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    tags: Vec<Tag>,
+    tags: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -77,10 +77,11 @@ pub trait OutputFmt {
     fn headline(&mut self, value: impl Display);
     fn command(&mut self, value: &str);
     fn file(&mut self, file: impl AsRef<Path>);
-    fn list(&mut self, note: Note, with_tags: bool);
+    fn list(&mut self, note: &Note, with_tags: bool);
     fn cleanup_remove(&mut self, note: &Note, with_tags: bool);
     fn cleanup_rename(&mut self, note: &Note);
     fn todo(&mut self, file: impl AsRef<Path>, content: &str);
+    fn command_output(&mut self, output: &str);
     fn end(&mut self);
 }
 
@@ -135,12 +136,12 @@ impl OutputFmt for TermFmt<DataBundle> {
         }
     }
 
-    fn list(&mut self, note: Note, with_tags: bool) {
+    fn list(&mut self, note: &Note, with_tags: bool) {
         self.bundle(|bundle| {
             bundle.list_output.push(ListEntryFmt {
                 file: note.path().to_owned(),
                 tags: with_tags
-                    .then(|| note.tags().cloned().collect())
+                    .then(|| note.cloned_tags().collect())
                     .unwrap_or_default(),
             })
         });
@@ -164,7 +165,7 @@ impl OutputFmt for TermFmt<DataBundle> {
             bundle.cleanup_remove_output.push(ListEntryFmt {
                 file: note.path().to_owned(),
                 tags: with_tags
-                    .then(|| note.tags().cloned().collect())
+                    .then(|| note.cloned_tags().collect())
                     .unwrap_or_default(),
             })
         });
@@ -202,6 +203,12 @@ impl OutputFmt for TermFmt<DataBundle> {
         if self.is_interactive() {
             termh1(file.as_ref().display());
             pretty_print_with_tags(content);
+        }
+    }
+
+    fn command_output(&mut self, output: &str) {
+        if self.is_plain() || self.is_interactive() {
+            println!("{}", output);
         }
     }
 

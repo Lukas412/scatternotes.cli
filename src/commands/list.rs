@@ -1,7 +1,7 @@
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 use crate::config::Config;
-use crate::note::NotesRepository;
+use crate::note::Note;
 use crate::output::{OutputFmt, Term};
 
 pub const NAME: &'static str = "list";
@@ -17,13 +17,8 @@ pub fn command() -> Command {
         .about("list all possible note files")
 }
 
-pub fn run(
-    command: &ArgMatches,
-    term: &mut Term,
-    config: &Config,
-    notes_repository: &NotesRepository,
-) {
-    let Ok(notes) = notes_repository.all_notes() else {
+pub fn run(command: &ArgMatches, term: &mut Term, config: &Config) {
+    let Ok(notes) = Note::all_notes(config) else {
         term.file_error(config.path(), "could not read notes directory!");
         term.end();
         return;
@@ -31,6 +26,6 @@ pub fn run(
     let show_tags = command.get_flag(ARG_TAGS);
 
     for note in notes {
-        term.list(note, show_tags);
+        term.list(&note, show_tags);
     }
 }

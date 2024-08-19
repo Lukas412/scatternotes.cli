@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::ops::Not;
@@ -5,14 +6,14 @@ use std::ops::Not;
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-pub enum Tag {
-    Name(String),
-    Person(String),
+pub enum Tag<'a> {
+    Name(Cow<'a, str>),
+    Person(Cow<'a, str>),
     Todo(TodoTag),
     Action(ActionTag),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize)]
 pub enum TodoTag {
     Todo,
     Done,
@@ -23,7 +24,7 @@ pub enum TodoTag {
     Review,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize)]
 pub enum ActionTag {
     Load,
     Expand,
@@ -31,38 +32,38 @@ pub enum ActionTag {
     Split,
 }
 
-impl Tag {
-    pub fn parse_all(input: &str) -> HashSet<Tag> {
+impl<'a> Tag<'a> {
+    pub fn all(mut input: &'a str) -> HashSet<Self> {
         let mut result = HashSet::new();
-        let mut input = input;
         while !input.is_empty() {
-            let Some(first_char) = input.chars().next() else {
-                continue;
-            };
-            if matches!(first_char, '#' | '@' | '~').not() {
-                input = &input[first_char.len_utf8()..];
-                continue;
+            match Self::parse_next(input) {
+                Ok((_, remaining, tag)) => {
+                    input = remaining;
+                    result.insert(tag);
+                }
+                Err(remaining) => input = remaining,
             }
-            let Some((remaining, tag)) = Self::parse_single(input) else {
-                input = &input[first_char.len_utf8()..];
-                continue;
-            };
-            input = remaining;
-            result.insert(tag);
         }
         result
     }
 
-    pub fn parse_single(input: &str) -> Option<(&str, Tag)> {
+    pub fn parse_next(input: &'a str) -> Result<(&'a str, &'a str, Tag<'a>), &'a str> {
+        let Some(index) = input.find(|char| matches!(char, '#' | '@' | '~')) else {
+            return Err("");
+        };
+        let (preceding, input) = input.split_at(index);
         let (start, input) = input.split_at(1);
-        let text: String = input.chars().take_while(valid_tag_char).collect();
+        let (text, input) = input.split_once(
+            |char| matches!(char, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '+' | '=' | 'ä' | 'Ä' | 'ö' | 'Ö' | 'ü' | 'Ü' | 'ß' ).not()
+        )
+        .unwrap_or((input, ""));
         if text.is_empty() {
-            return None;
+            return Err("");
         }
         let remaining = &input[text.len()..];
-        let todo = |tag| Some((remaining, Tag::Todo(tag)));
-        let action = |tag| Some((remaining, Tag::Action(tag)));
-        return match (start, text.as_str()) {
+        let todo = |tag| Ok((preceding, remaining, Tag::Todo(tag)));
+        let action = |tag| Ok((preceding, remaining, Tag::Action(tag)));
+        return match (start, text) {
             ("#", "todo") => todo(TodoTag::Todo),
             ("#", "done") => todo(TodoTag::Done),
             ("#", "idea") => todo(TodoTag::Idea),
@@ -70,13 +71,13 @@ impl Tag {
             ("#", "asap") => todo(TodoTag::Asap),
             ("#", "review") => todo(TodoTag::Review),
             ("#", "remind") => todo(TodoTag::Remind),
-            ("#", _) => Some((remaining, Tag::Name(text))),
+            ("#", _) => Ok((preceding, remaining, Tag::Name(text.into()))),
             ("~", "load") => action(ActionTag::Load),
             ("~", "expand") => action(ActionTag::Expand),
             ("~", "steps") => action(ActionTag::Steps),
             ("~", "split") => action(ActionTag::Split),
-            ("@", _) => Some((remaining, Tag::Person(text))),
-            _ => None,
+            ("@", _) => Ok((preceding, remaining, Tag::Person(text.into()))),
+            _ => Err(input),
         };
     }
 
@@ -96,16 +97,22 @@ impl Tag {
             Tag::Action(value) => value.text(),
         }
     }
-}
 
-impl Display for Tag {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.prefix(), self.text())
+    pub fn contains(&self, other: &str) -> bool {
+        self.text().contains(other)
     }
 }
 
-fn valid_tag_char(char: &char) -> bool {
-    matches!(char, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '+' | '=' | 'ä' | 'Ä' | 'ö' | 'Ö' | 'ü' | 'Ü' | 'ß' )
+impl<'a> PartialEq<str> for Tag<'a> {
+    fn eq(&self, other: &str) -> bool {
+        *self.text() == *other
+    }
+}
+
+impl<'a> Display for Tag<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.prefix(), self.text())
+    }
 }
 
 impl TodoTag {

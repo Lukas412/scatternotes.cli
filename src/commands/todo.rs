@@ -1,7 +1,9 @@
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
-use crate::note::NotesRepository;
+use crate::config::Config;
+use crate::note::Note;
 use crate::output::{OutputFmt, Term};
+use crate::todo::Todo;
 
 pub const NAME: &'static str = "todo";
 
@@ -34,11 +36,11 @@ pub fn command() -> Command {
         .about("find you todos")
 }
 
-pub fn run(command: &ArgMatches, term: &mut Term, notes_repository: &NotesRepository) {
+pub fn run(command: &ArgMatches, term: &mut Term, config: &Config) {
     match command.subcommand().unwrap() {
         (CMD_LIST, command) => {
             let view_done = command.get_flag(ARG_DONE);
-            run_list(term, notes_repository, view_done);
+            run_list(term, config, view_done);
         }
         (CMD_SEARCH, command) => {
             let queries: Vec<_> = command
@@ -47,15 +49,15 @@ pub fn run(command: &ArgMatches, term: &mut Term, notes_repository: &NotesReposi
                 .into_iter()
                 .collect();
             let view_done = command.get_flag(ARG_DONE);
-            run_search(term, notes_repository, queries.as_slice(), view_done)
+            run_search(term, config, queries.as_slice(), view_done)
         }
         (_, _) => term.error("command not implemented yet"),
     }
 }
 
-fn run_list(term: &mut Term, notes_repository: &NotesRepository, view_done: bool) {
-    for note in notes_repository.all_notes().unwrap() {
-        for todo in note.todos() {
+fn run_list(term: &mut Term, config: &Config, view_done: bool) {
+    for note in Note::all_notes(config).unwrap() {
+        for todo in Todo::all(&note) {
             if !view_done && todo.is_done() {
                 continue;
             }
@@ -64,14 +66,9 @@ fn run_list(term: &mut Term, notes_repository: &NotesRepository, view_done: bool
     }
 }
 
-fn run_search(
-    term: &mut Term,
-    notes_repository: &NotesRepository,
-    queries: &[&String],
-    view_done: bool,
-) {
-    for note in notes_repository.search(queries).unwrap() {
-        for todo in note.todos() {
+fn run_search(term: &mut Term, config: &Config, queries: &[&String], view_done: bool) {
+    for note in Note::search(config, queries).unwrap() {
+        for todo in Todo::all(&note) {
             if !view_done && todo.is_done() {
                 continue;
             }

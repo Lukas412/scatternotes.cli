@@ -2,11 +2,11 @@ use clap::{ArgMatches, Command};
 use termfmt::TermFmtExt;
 
 use crate::config::Config;
-use crate::note::NotesRepository;
 use crate::output::OutputFmt;
 
 mod carlender;
 mod clean;
+mod code;
 mod commit;
 mod generate;
 mod list;
@@ -17,6 +17,7 @@ pub fn list() -> impl IntoIterator<Item = Command> {
     [
         carlender::command(),
         clean::command(),
+        code::command(),
         commit::command(),
         generate::command(),
         list::command(),
@@ -27,8 +28,6 @@ pub fn list() -> impl IntoIterator<Item = Command> {
 
 pub fn run(command: ArgMatches) {
     let config = Config::load();
-    let notes_repository = NotesRepository::new(config.clone());
-
     let mut term = command.termfmt(&config);
 
     let Some((name, command)) = command.subcommand() else {
@@ -39,12 +38,13 @@ pub fn run(command: ArgMatches) {
 
     match name {
         carlender::NAME => carlender::run(command, &mut term),
-        clean::NAME => clean::run(&mut term, &config, &notes_repository),
+        clean::NAME => clean::run(&mut term, &config),
+        code::NAME => code::run(command, &mut term, &config),
         commit::NAME => commit::run(&mut term, &config),
         generate::NAME => generate::run(command, &mut term, &config),
-        list::NAME => list::run(command, &mut term, &config, &notes_repository),
-        search::NAME => search::run(command, &mut term, &notes_repository),
-        todo::NAME => todo::run(command, &mut term, &notes_repository),
+        list::NAME => list::run(command, &mut term, &config),
+        search::NAME => search::run(command, &mut term, &config),
+        todo::NAME => todo::run(command, &mut term, &config),
         _ => term.error(format_args!("command not implemented: {}", name)),
     }
 

@@ -1,6 +1,7 @@
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
-use crate::note::NotesRepository;
+use crate::config::Config;
+use crate::note::Note;
 use crate::output::{OutputFmt, Term};
 
 pub const NAME: &'static str = "search";
@@ -22,7 +23,7 @@ pub fn command() -> Command {
         .about("search for notes using tags")
 }
 
-pub fn run(command: &ArgMatches, term: &mut Term, notes_repository: &NotesRepository) {
+pub fn run(command: &ArgMatches, term: &mut Term, config: &Config) {
     let Some(tags) = command.get_many::<String>(ARG_QUERIES) else {
         term.error("please provide tags to search by!");
         term.end();
@@ -30,7 +31,7 @@ pub fn run(command: &ArgMatches, term: &mut Term, notes_repository: &NotesReposi
     };
 
     let queries: Vec<_> = tags.into_iter().collect();
-    let Ok(notes) = notes_repository.search(queries.as_slice()) else {
+    let Ok(notes) = Note::search(config, queries.as_slice()) else {
         term.error("could not read notes directory!");
         term.end();
         return;
@@ -38,6 +39,6 @@ pub fn run(command: &ArgMatches, term: &mut Term, notes_repository: &NotesReposi
 
     let show_tags = command.get_flag(ARG_TAGS);
     for note in notes {
-        term.list(note, show_tags);
+        term.list(&note, show_tags);
     }
 }

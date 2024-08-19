@@ -1,16 +1,22 @@
 use std::collections::HashSet;
 
+use crate::note::Note;
+use crate::tag::Tag;
+
 use super::tag::TodoTag;
-use super::Tag;
 
 pub struct Todo<'a> {
     content: &'a str,
-    tags: HashSet<Tag>,
+    tags: HashSet<Tag<'a>>,
 }
 
 impl<'a> Todo<'a> {
-    pub fn parse(content: &'a str) -> Option<Self> {
-        let tags = Tag::parse_all(content);
+    pub fn all(note: &'a Note) -> impl Iterator<Item = Self> {
+        note.parts().filter_map(|part| Todo::parse_str(part))
+    }
+
+    pub fn parse_str(content: &'a str) -> Option<Self> {
+        let tags = Tag::all(content);
         tags.iter()
             .any(|tag| matches!(tag, Tag::Todo(_)))
             .then(|| Self { content, tags })
