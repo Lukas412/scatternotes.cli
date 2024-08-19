@@ -10,6 +10,7 @@ mod code;
 mod commit;
 mod generate;
 mod list;
+mod persons;
 mod search;
 mod todo;
 
