@@ -66,9 +66,9 @@ pub fn run(term: &mut Term, config: &Config) {
         return;
     }
 
-    term.command("git pull");
+    term.command("git pull --rebase");
     if Command::new("git")
-        .arg("pull")
+        .args(["pull", "--rebase"])
         .current_dir(config.path())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
