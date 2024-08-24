@@ -20,6 +20,7 @@ mod config;
 mod name;
 mod note;
 mod output;
+mod person;
 mod tag;
 mod todo;
 

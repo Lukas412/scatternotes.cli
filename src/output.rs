@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
@@ -6,6 +7,7 @@ use termfmt::{termarrow, termarrow_fg, termerr, termh1, terminfo, BundleFmt, Fg,
 
 use crate::config::Config;
 use crate::note::Note;
+use crate::person::Person;
 
 use self::tags::pretty_print_with_tags;
 
@@ -28,6 +30,8 @@ pub struct DataBundle {
     cleanup_rename_output: Vec<PathBuf>,
     #[serde(rename = "todos", skip_serializing_if = "Vec::is_empty")]
     todos_output: Vec<TodoFmt>,
+    #[serde(rename = "persons", skip_serializing_if = "HashSet::is_empty")]
+    persons_output: HashSet<Person<'static>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     hint: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -81,6 +85,7 @@ pub trait OutputFmt {
     fn cleanup_remove(&mut self, note: &Note, with_tags: bool);
     fn cleanup_rename(&mut self, note: &Note);
     fn todo(&mut self, file: impl AsRef<Path>, content: &str);
+    fn persons(&mut self, persons: &HashSet<Person<'static>>);
     fn command_output(&mut self, output: &str);
     fn end(&mut self);
 }
@@ -203,6 +208,26 @@ impl OutputFmt for TermFmt<DataBundle> {
         if self.is_interactive() {
             termh1(file.as_ref().display());
             pretty_print_with_tags(content);
+        }
+    }
+
+    fn persons(&mut self, persons: &HashSet<Person<'static>>) {
+        self.bundle(|bundle| bundle.persons_output.extend(persons.clone()));
+        if self.is_plain() {
+            for person in persons {
+                println!("{}", person);
+            }
+        }
+        if self.is_interactive() {
+            let mut iter = persons.iter();
+            let Some(first) = iter.next() else {
+                return;
+            };
+            print!("@{}", first);
+            for person in iter {
+                print!(", @{}", person);
+            }
+            println!("");
         }
     }
 

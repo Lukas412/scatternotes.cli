@@ -2,7 +2,9 @@ use core::{slice, str};
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fmt::Write;
-use std::fs::{self, read_to_string};
+use std::fs::{self, read_to_string, OpenOptions};
+use std::io::{Read, Seek, SeekFrom};
+use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -12,6 +14,7 @@ use nom::character::complete::{char, u16, u8};
 use nom::IResult;
 
 use crate::config::Config;
+use crate::person::Person;
 use crate::tag::Tag;
 
 #[derive(Clone)]
@@ -57,6 +60,18 @@ impl Note {
         })
     }
 
+    pub fn edit(path: PathBuf, func: impl Fn(&mut String) -> bool) -> eyre::Result<()> {
+        let mut file = OpenOptions::new().read(true).write(true).open(path)?;
+        let mut b = String::new();
+        file.read_to_string(&mut b)?;
+        if !func(&mut b) {
+            return Ok(());
+        }
+        file.write_all_at(b.as_bytes(), 0)?;
+        file.set_len(b.len() as u64)?;
+        Ok(())
+    }
+
     pub fn name(&self) -> &str {
         self.path.file_name().and_then(OsStr::to_str).unwrap()
     }
@@ -93,10 +108,11 @@ impl Note {
         join_tags_impl(iter, separator)
     }
 
-    pub fn persons(&self) -> impl Iterator<Item = &str> {
-        self.tags
-            .iter()
-            .filter_map(|tag| tag.is_person().then(|| tag.text()))
+    pub fn persons<'a>(&'a self) -> impl Iterator<Item = &'a Person<'a>> {
+        self.tags.iter().filter_map(|tag| match tag {
+            Tag::Person(person) => Some(person),
+            _ => None,
+        })
     }
 
     pub fn parts(&self) -> impl Iterator<Item = &str> {

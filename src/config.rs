@@ -13,6 +13,7 @@ pub struct Config {
     path: PathBuf,
     code_path: PathBuf,
     carlender_path: PathBuf,
+    meta_path: PathBuf,
 }
 
 impl Config {
@@ -22,11 +23,17 @@ impl Config {
             .unwrap_or_default()
     }
 
-    pub fn new(path: PathBuf, code_path: PathBuf, carlender_path: PathBuf) -> eyre::Result<Self> {
+    pub fn new(
+        path: PathBuf,
+        code_path: PathBuf,
+        carlender_path: PathBuf,
+        meta_path: PathBuf,
+    ) -> eyre::Result<Self> {
         Ok(Self {
             path,
             code_path,
             carlender_path,
+            meta_path,
         })
     }
 
@@ -45,6 +52,11 @@ impl Config {
         self.code_path.join(name)
     }
 
+    pub fn meta(&self, name: &str) -> PathBuf {
+        ensure_directory_exists(&self.meta_path).unwrap();
+        self.meta_path.join(name)
+    }
+
     pub fn carlender(&self, date: NaiveDate) -> PathBuf {
         ensure_directory_exists(&self.carlender_path).unwrap();
         self.carlender_path
@@ -57,7 +69,8 @@ impl Default for Config {
         let path: PathBuf = env::var("HOME").unwrap().add("/notes").into();
         let code_path = path.join("code");
         let carlender_path = path.join("carlender");
-        Self::new(path, code_path, carlender_path).unwrap()
+        let meta_path = path.join("meta");
+        Self::new(path, code_path, carlender_path, meta_path).unwrap()
     }
 }
 

@@ -5,10 +5,12 @@ use std::ops::Not;
 
 use serde::Serialize;
 
+use crate::person::Person;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub enum Tag<'a> {
     Name(Cow<'a, str>),
-    Person(Cow<'a, str>),
+    Person(Person<'a>),
     Todo(TodoTag),
     Action(ActionTag),
 }
@@ -33,15 +35,17 @@ pub enum ActionTag {
 }
 
 impl<'a> Tag<'a> {
-    pub fn all(mut input: &'a str) -> HashSet<Self> {
+    pub fn all(input: &'a str) -> HashSet<Self> {
         let mut result = HashSet::new();
-        while !input.is_empty() {
-            match Self::parse_next(input) {
-                Ok((_, remaining, tag)) => {
-                    input = remaining;
-                    result.insert(tag);
+        for mut input in iter_non_code_blocks(input) {
+            while !input.is_empty() {
+                match Self::parse_next(input) {
+                    Ok((_, remaining, tag)) => {
+                        input = remaining;
+                        result.insert(tag);
+                    }
+                    Err(remaining) => input = remaining,
                 }
-                Err(remaining) => input = remaining,
             }
         }
         result
@@ -53,18 +57,13 @@ impl<'a> Tag<'a> {
         };
         let (preceding, input) = input.split_at(index);
         let (start, input) = input.split_at(1);
-        let (text, input) = input.split_once(
+        let (text, remaining) = input.split_once(
             |char| matches!(char, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' | '+' | '=' | 'ä' | 'Ä' | 'ö' | 'Ö' | 'ü' | 'Ü' | 'ß' ).not()
         )
         .unwrap_or((input, ""));
         if text.is_empty() {
             return Err("");
         }
-        let remaining = if input.len() > text.len() {
-            &input[text.len()..]
-        } else {
-            ""
-        };
         let todo = |tag| Ok((preceding, remaining, Tag::Todo(tag)));
         let action = |tag| Ok((preceding, remaining, Tag::Action(tag)));
         return match (start, text) {
@@ -96,7 +95,7 @@ impl<'a> Tag<'a> {
     pub fn text(&self) -> &str {
         match self {
             Tag::Name(value) => value,
-            Tag::Person(value) => value,
+            Tag::Person(value) => value.name(),
             Tag::Todo(value) => value.text(),
             Tag::Action(value) => value.text(),
         }
@@ -146,4 +145,21 @@ impl ActionTag {
             Self::Split => "split",
         }
     }
+}
+
+fn iter_non_code_blocks(input: &str) -> impl Iterator<Item = &str> {
+    let mut in_code_block = false;
+    input
+        .split("```")
+        .filter(move |_| {
+            in_code_block = !in_code_block;
+            in_code_block
+        })
+        .flat_map(|text| {
+            let mut in_code_inline = false;
+            text.split('`').filter(move |_| {
+                in_code_inline = !in_code_inline;
+                in_code_inline
+            })
+        })
 }
